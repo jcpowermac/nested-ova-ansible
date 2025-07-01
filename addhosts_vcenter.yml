@@ -179,6 +179,9 @@
         enable_vmotion: true
         esxi_hostname: "{{ hostvars[groups['esxi'][fd_idx]].NESTEDVMIP }}"
         enable_mgmt: true
+        enable_vsan: false
+        enable_replication: false
+        enable_ft: false
         device: vmk0
         network:
           type: 'dhcp'
