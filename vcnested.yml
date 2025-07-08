@@ -41,35 +41,6 @@
         name: "{{ host_fact_hostname }}"
         state: present
 
-    - name: "Does VC virtual machine {{ host_fact_hostname }} exist get ip"
-      community.vmware.vmware_guest_info:
-        datacenter: "{{ vc_datacenter }}"
-        name: "{{ host_fact_hostname }}"
-        schema: vsphere
-        properties:
-          - guest.ipAddress
-      register: nested_vm
-
-    - name: Show ip address
-      ansible.builtin.debug:
-        msg: "ip is: {{ nested_vm.instance.guest.ipAddress }}"
-
-    - name: Wait for vCenter
-      community.vmware.vmware_about_info:
-        hostname: '{{ nested_vm.instance.guest.ipAddress }}'
-        username: 'administrator@{{ vc_fact_domain }}'
-        password: "{{ vc_fact_password }}"
-        validate_certs: false
-      retries: 30
-      delay: 60
-      register: result
-      until: result is succeeded
-
-    - name: Add host to group vc
-      ansible.builtin.add_host:
-        name: '{{ host_fact_hostname }}'
-        groups: vc
-        NESTEDVMIP: "{{ nested_vm.instance.guest.ipAddress }}"
   rescue:
     - name: Deploy VM from Content Library
       vmware.vmware.deploy_content_library_ovf:
@@ -136,26 +107,27 @@
 
 
     - name: "Does VC virtual machineexist get ip {{ host_fact_hostname }}"
-      community.vmware.vmware_guest_info:
+      community.vmware.vmware_guest:
         datacenter: "{{ vc_datacenter }}"
         name: "{{ host_fact_hostname }}"
-        schema: vsphere
-        properties:
-          - guest.ipAddress
       register: nested_vm
-      until: nested_vm.instance.guest.ipAddress != None
+      until: nested_vm.instance.ipv4 != None 
       retries: 10
       delay: 30
+
+    - name: Get IPv4 address from guest IP addresses
+      ansible.builtin.set_fact:
+        ipv4_address: "{{ nested_vm.instance.ipv4 }}"
 
     - name: Add host to group vc
       ansible.builtin.add_host:
         name: '{{ host_fact_hostname }}'
         groups: vc
-        NESTEDVMIP: "{{ nested_vm.instance.guest.ipAddress }}"
+        NESTEDVMIP: "{{ nested_vm.instance.ipv4 }}"
 
     - name: Show ip
       ansible.builtin.debug:
-        msg: "ip is: {{ nested_vm.instance }}"
+        msg: "ip is: {{ nested_vm.instance.ipv4 }}"
 
     - name: Wait for vCenter
       vmware_about_info:
@@ -168,9 +140,9 @@
       register: result
       until: result is succeeded
 
-    - name: "Wait for {{ hostvars[groups['vc'][vcenter_idx]].inventory_hostname }} {{ nested_vm.instance.guest.ipAddress }} install of VC on host to be complete"
+    - name: "Wait for {{ hostvars[groups['vc'][vcenter_idx]].inventory_hostname }} {{ ipv4_address }} install of VC on host to be complete"
       ansible.builtin.wait_for:
-        host: "{{ nested_vm.instance.guest.ipAddress }}"
+        host: "{{ ipv4_address }}"
         port: 443
         sleep: 10
         timeout: 900

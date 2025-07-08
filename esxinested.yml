@@ -31,21 +31,6 @@
         name: "{{ host_fact_hostname }}"
         state: present
 
-    - name: "Does ESXi virtual machine exist get ip"
-      community.vmware.vmware_guest_info:
-        datacenter: "{{ vc_datacenter }}"
-        name: "{{ host_fact_hostname }}"
-        schema: vsphere
-        properties:
-          - guest.ipAddress
-      register: nested_vm
-
-    - name: Add host to group esxi
-      ansible.builtin.add_host:
-        name: '{{ host_fact_hostname }}'
-        groups: esxi
-        NESTEDVMIP: "{{ nested_vm.instance.guest.ipAddress }}"
-
   rescue:
     - name: Clone ESXi
       community.vmware.vmware_guest:
@@ -131,16 +116,20 @@
   community.vmware.vmware_guest_info:
     datacenter: "{{ vc_datacenter }}"
     name: "{{ host_fact_hostname }}"
-    schema: vsphere
-    properties:
-      - guest.ipAddress
   register: nested_vm
+  until: nested_vm.instance.ipv4 != None 
+  retries: 10
+  delay: 30
+
+- name: Get IPv4 address from guest IP addresses
+  ansible.builtin.set_fact:
+    ipv4_address: "{{ nested_vm.instance.ipv4 }}"
 
 - name: Add host to group esxi
   ansible.builtin.add_host:
     name: '{{ host_fact_hostname }}'
     groups: esxi
-    NESTEDVMIP: "{{ nested_vm.instance.guest.ipAddress }}"
+    NESTEDVMIP: "{{ nested_vm.instance.ipv4 }}"
 
 - name: "*** Wait for {{ hostvars[groups['esxi'][my_idx]].inventory_hostname }} {{ hostvars[groups['esxi'][my_idx]].NESTEDVMIP }} install of ESXi on host to be complete"
   ansible.builtin.wait_for:
