@@ -1,5 +1,7 @@
 # nested-ova-ansible
 
+** https://github.com/openshift-eng/nested-ova-ansible is now the canonical repo **
+
 Provisions nested vCenter and ESXi hosts.
 
 ## Prerequisites
