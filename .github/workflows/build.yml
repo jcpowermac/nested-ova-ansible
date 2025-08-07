@@ -17,7 +17,7 @@ jobs:
       uses: redhat-actions/buildah-build@v2.12
       with:
         image: nested-environment-builder
-        tags: latest ${{ github.sha }}
+        tags: openshift-splat-team ${{ github.sha }}
         dockerfiles: ./Containerfile
     # Podman Login action (https://github.com/redhat-actions/podman-login) also be used to log in,
     # in which case 'username' and 'password' can be omitted.
