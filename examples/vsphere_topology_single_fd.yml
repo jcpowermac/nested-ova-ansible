@@ -1,0 +1,181 @@
+---
+# Example: Single Failure Domain Topology
+#
+# This is the simplest deployment topology with a single vCenter and a single failure domain.
+# Suitable for:
+#   - Development environments
+#   - Basic testing
+#   - Single-zone OpenShift clusters
+#
+# Resources:
+#   - 3 ESXi hosts (192.168.1.10-12)
+#   - 1 vCenter (192.168.1.5)
+#   - 1 Datacenter with 1 Cluster
+#   - 1 Failure Domain (ComputeCluster zone type)
+
+deployment_name: single-fd-lab
+region: us-east-1
+
+# ESXi Host Configuration
+esxi_hosts:
+  - name: esxi01
+    ip: 192.168.1.10
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 8
+    memory_mb: 65536  # 64 GB
+    disk_gb: 200
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi02
+    ip: 192.168.1.11
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 8
+    memory_mb: 65536
+    disk_gb: 200
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi03
+    ip: 192.168.1.12
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 8
+    memory_mb: 65536
+    disk_gb: 200
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+# vCenter Configuration
+vcenter_vms:
+  - name: vcsa01
+    hostname: vcsa01.lab.local
+    ip: 192.168.1.5
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    dns: 192.168.1.1
+    domain: lab.local
+    ntp: pool.ntp.org
+    cpu: 8
+    memory_mb: 24576  # 24 GB
+    disk_gb: 250
+    username: administrator@vsphere.local
+    password: "{{ vault_vcenter_password }}"
+    sso_domain: vsphere.local
+    datacenter: dc1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+    # Datacenter and Cluster Configuration
+    datacenters:
+      - name: dc1
+        clusters:
+          - name: cluster1
+            drs_enabled: true
+            drs_vmotion_rate: 3
+            ha_enabled: true
+            ha_admission_control: true
+            ha_host_monitoring: enabled
+            ha_vm_monitoring: vmMonitoringOnly
+
+    # Distributed vSwitch Configuration
+    dvswitches:
+      - name: dvSwitch
+        datacenter: dc1
+        version: 7.0.0
+        mtu: 1500
+        uplinks: 2
+        discovery_protocol: lldp
+        discovery_operation: listen
+        port_groups:
+          - name: VM Network
+            vlan: 0
+            num_ports: 128
+          - name: Storage Network
+            vlan: 100
+            num_ports: 64
+
+    # ESXi hosts managed by this vCenter
+    esxi_hosts:
+      - hostname: 192.168.1.10
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.11
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.12
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+
+# Content Library Configuration (recommended for vCenter deployment)
+content_library:
+  name: nested-vsphere-templates
+  description: OVA templates for nested vSphere deployment
+  datastore: "{{ vsphere_parent_vcenter.datastore }}"
+  esxi_template_item: Nested_ESXi8.0u2c_Appliance_Template_v1
+  vcenter_template_item: VMware-vCenter-Server-Appliance-8.0.2.00100
+
+# Failure Domain Configuration
+failure_domains:
+  - name: zone-a
+    region: us-east-1
+    zone: zone-a
+    zone_type: ComputeCluster  # Tag the entire cluster
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: vcsa01.lab.local
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    # NFS Datastore (optional)
+    nfs_datastores:
+      - datastore_name: nfs-storage
+        nfs_server: 192.168.1.100
+        nfs_path: /export/storage
+        nfs_version: 3
+        esxi_hostname: 192.168.1.10
+    # VMFS Datastore (optional - created on local ESXi disk)
+    vmfs_datastores:
+      - datastore_name: vmfs-local
+        esxi_hostname: 192.168.1.10
+        disk_ctd: "0:1"  # Controller:Target:Disk
+
+# Deployment Options
+wait_for_ip: true
+vm_wait_timeout: 900  # 15 minutes
+vsphere_debug_mode: false

@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  role_name: vsphere_host_config
+  author: OpenShift SPLAT Team
+  description: Add ESXi hosts to vCenter and configure host settings
+  company: Red Hat
+  license: Apache-2.0
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - vsphere
+    - vmware
+    - esxi
+    - host
+    - configuration
+
+dependencies: []
+
+collections:
+  - community.vmware

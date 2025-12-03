@@ -1,0 +1,46 @@
+---
+# vsphere_tagging role defaults
+
+# vCenter connection
+vsphere_tagging_vcenter:
+  hostname: ""
+  username: "administrator@vsphere.local"
+  password: ""
+  validate_certs: false
+
+# Tagging configuration
+vsphere_tagging_enabled: true
+
+# Failure domains to tag
+# Structure:
+# vsphere_tagging_failure_domains:
+#   - region: "region1"
+#     zone: "zone1"
+#     region_type: "Datacenter"  # Datacenter or ComputeCluster
+#     zone_type: "ComputeCluster"  # ComputeCluster, HostGroup
+#     datacenter: "dc1"
+#     cluster: "cluster1"
+vsphere_tagging_failure_domains: []
+
+# Tag category names
+vsphere_tagging_region_category: "{{ default_region_tag_category | default('openshift-region') }}"
+vsphere_tagging_zone_category: "{{ default_zone_tag_category | default('openshift-zone') }}"
+
+# Object types that can be tagged
+vsphere_tagging_region_objects: "{{ default_region_tag_objects | default(['Datacenter', 'Cluster']) }}"
+vsphere_tagging_zone_objects: "{{ default_zone_tag_objects | default(['Host', 'Cluster']) }}"
+
+# vSphere object type mapping
+vsphere_tagging_type_map:
+  Datacenter: "Datacenter"
+  ComputeCluster: "ClusterComputeResource"
+  HostGroup: "HostSystem"
+  Host: "HostSystem"
+  Cluster: "ClusterComputeResource"
+
+# Retry settings (tagging can be slow)
+vsphere_tagging_retry_count: 30
+vsphere_tagging_retry_delay: 60
+
+# Debug logging
+vsphere_tagging_debug: "{{ enable_debug_mode | default(false) }}"

@@ -1,0 +1,20 @@
+---
+# Ansible Vault - Encrypted Secrets
+# IMPORTANT: This file should be encrypted with: ansible-vault encrypt group_vars/all/vault.yml
+# To edit: ansible-vault edit group_vars/all/vault.yml
+# To view: ansible-vault view group_vars/all/vault.yml
+#
+# Create .vault_pass file with your vault password and add it to .gitignore
+# Or set ANSIBLE_VAULT_PASSWORD_FILE environment variable
+
+# Nested vCenter password
+# This password will be set on all nested vCenter appliances
+vault_nested_vcenter_password: "CHANGE_ME_SecurePassword123!"
+
+# Nested ESXi password
+# This password will be set on all nested ESXi hosts
+vault_nested_esxi_password: "CHANGE_ME_SecurePassword123!"
+
+# Parent vCenter password (if not using environment variables)
+# Uncomment and set if you want to store parent vCenter password in vault
+# vault_parent_vcenter_password: "ParentVCPassword"

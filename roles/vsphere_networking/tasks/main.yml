@@ -1,0 +1,75 @@
+---
+# Main tasks for vsphere_networking role
+
+- name: Validate vCenter connection
+  ansible.builtin.assert:
+    that:
+      - vsphere_networking_vcenter.hostname is defined
+      - vsphere_networking_vcenter.password is defined
+    fail_msg: "vCenter connection parameters required"
+    quiet: true
+
+- name: Log networking configuration start
+  ansible.builtin.debug:
+    msg: "{{ 'Starting networking configuration' | deployment_log('INFO', {'vcenter': vsphere_networking_vcenter.hostname}) }}"
+  when: vsphere_networking_debug
+
+- name: Create distributed vSwitches
+  community.vmware.vmware_dvswitch:
+    hostname: "{{ vsphere_networking_vcenter.hostname }}"
+    username: "{{ vsphere_networking_vcenter.username }}"
+    password: "{{ vsphere_networking_vcenter.password }}"
+    validate_certs: "{{ vsphere_networking_vcenter.validate_certs }}"
+    datacenter: "{{ dvswitch.datacenter }}"
+    switch: "{{ dvswitch.name }}"
+    version: "{{ dvswitch.version | default(vsphere_networking_default_version) }}"
+    mtu: "{{ dvswitch.mtu | default(vsphere_networking_default_mtu) }}"
+    uplink_quantity: "{{ dvswitch.uplink_quantity | default(vsphere_networking_default_uplink_quantity) }}"
+    state: present
+  loop: "{{ vsphere_networking_dvswitches }}"
+  loop_control:
+    loop_var: dvswitch
+    label: "{{ dvswitch.name }}"
+  when: vsphere_networking_dvswitches | length > 0
+
+- name: Pause after dvSwitch creation
+  ansible.builtin.pause:
+    seconds: "{{ vsphere_networking_pause_after_dvs_create }}"
+  when: vsphere_networking_dvswitches | length > 0
+
+- name: Add ESXi hosts to distributed vSwitches
+  ansible.builtin.include_tasks:
+    file: add_host_to_dvs.yml
+  loop: "{{ vsphere_networking_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"
+  when: vsphere_networking_esxi_hosts | length > 0
+
+- name: Pause after adding hosts to dvSwitch
+  ansible.builtin.pause:
+    seconds: "{{ vsphere_networking_pause_after_host_add }}"
+  when: vsphere_networking_esxi_hosts | length > 0
+
+- name: Create distributed port groups
+  community.vmware.vmware_dvs_portgroup:
+    hostname: "{{ vsphere_networking_vcenter.hostname }}"
+    username: "{{ vsphere_networking_vcenter.username }}"
+    password: "{{ vsphere_networking_vcenter.password }}"
+    validate_certs: "{{ vsphere_networking_vcenter.validate_certs }}"
+    portgroup_name: "{{ portgroup.name }}"
+    switch_name: "{{ portgroup.switch_name }}"
+    vlan_id: "{{ portgroup.vlan_id | default(0) }}"
+    num_ports: "{{ portgroup.num_ports | default(120) }}"
+    port_binding: "{{ portgroup.port_binding | default('static') }}"
+    state: present
+  loop: "{{ vsphere_networking_portgroups }}"
+  loop_control:
+    loop_var: portgroup
+    label: "{{ portgroup.name }}"
+  when: vsphere_networking_portgroups | length > 0
+
+- name: Log networking configuration complete
+  ansible.builtin.debug:
+    msg: "{{ 'Networking configuration completed' | deployment_log('INFO', {'dvswitches': vsphere_networking_dvswitches | length}) }}"
+  when: vsphere_networking_debug

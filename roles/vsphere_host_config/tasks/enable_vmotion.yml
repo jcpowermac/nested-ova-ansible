@@ -1,0 +1,29 @@
+---
+# Enable vMotion on management vmkernel interface
+
+- name: Enable vMotion on vmk0 for each host
+  community.vmware.vmware_vmkernel:
+    hostname: "{{ vsphere_host_config_vcenter.hostname }}"
+    username: "{{ vsphere_host_config_vcenter.username }}"
+    password: "{{ vsphere_host_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_host_config_vcenter.validate_certs }}"
+    esxi_hostname: "{{ esxi_host.hostname }}"
+    vswitch_name: "{{ vsphere_host_config_vmotion_vswitch }}"
+    portgroup_name: "{{ vsphere_host_config_vmotion_portgroup }}"
+    device: "{{ vsphere_host_config_vmotion_device }}"
+    enable_vmotion: true
+    enable_mgmt: true
+    enable_vsan: false
+    enable_replication: false
+    enable_ft: false
+    network:
+      type: "{{ vsphere_host_config_vmotion_network_type }}"
+  loop: "{{ vsphere_host_config_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"
+
+- name: Log vMotion configuration
+  ansible.builtin.debug:
+    msg: "vMotion enabled on all ESXi hosts"
+  when: vsphere_host_config_debug

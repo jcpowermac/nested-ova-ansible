@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  role_name: vsphere_tagging
+  author: OpenShift SPLAT Team
+  description: Configure vSphere tags for OpenShift region/zone topology
+  company: Red Hat
+  license: Apache-2.0
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - vsphere
+    - vmware
+    - tagging
+    - openshift
+    - topology
+
+dependencies: []
+
+collections:
+  - community.vmware

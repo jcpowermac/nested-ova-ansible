@@ -1,0 +1,276 @@
+---
+# Preflight validation playbook for nested vSphere deployment
+# Validates all prerequisites before attempting deployment
+
+- name: Preflight Validation for Nested vSphere Deployment
+  hosts: localhost
+  gather_facts: true
+  vars:
+    topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
+    preflight_strict_mode: "{{ lookup('env', 'PREFLIGHT_STRICT_MODE') | default('true', true) | bool }}"
+
+  tasks:
+    # Validation 1: Check Ansible version
+    - name: Validate Ansible version
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full is version('2.15.0', '>=')
+        fail_msg: "Ansible version must be >= 2.15.0 (current: {{ ansible_version.full }})"
+        success_msg: "Ansible version check passed ({{ ansible_version.full }})"
+
+    # Validation 2: Check Python version
+    - name: Validate Python version
+      ansible.builtin.assert:
+        that:
+          - ansible_python_version is version('3.9', '>=')
+        fail_msg: "Python version must be >= 3.9 (current: {{ ansible_python_version }})"
+        success_msg: "Python version check passed ({{ ansible_python_version }})"
+
+    # Validation 3: Check required collections
+    - name: Check if community.vmware collection is installed
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection list community.vmware
+      register: _vmware_collection_check
+      changed_when: false
+      failed_when: false
+
+    - name: Validate community.vmware collection
+      ansible.builtin.assert:
+        that:
+          - _vmware_collection_check.rc == 0
+          - "'community.vmware' in _vmware_collection_check.stdout"
+        fail_msg: "community.vmware collection not found. Run: ansible-galaxy collection install -r collections/requirements.yml"
+        success_msg: "community.vmware collection is installed"
+
+    - name: Check if vmware.vmware collection is installed
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection list vmware.vmware
+      register: _vmware_vmware_collection_check
+      changed_when: false
+      failed_when: false
+
+    - name: Validate vmware.vmware collection
+      ansible.builtin.assert:
+        that:
+          - _vmware_vmware_collection_check.rc == 0
+          - "'vmware.vmware' in _vmware_vmware_collection_check.stdout"
+        fail_msg: "vmware.vmware collection not found. Run: ansible-galaxy collection install -r collections/requirements.yml"
+        success_msg: "vmware.vmware collection is installed"
+
+    # Validation 4: Check Python dependencies
+    - name: Check for pyvmomi library
+      ansible.builtin.command:
+        cmd: python3 -c "import pyVmomi"
+      register: _pyvmomi_check
+      changed_when: false
+      failed_when: false
+
+    - name: Validate pyvmomi library
+      ansible.builtin.assert:
+        that:
+          - _pyvmomi_check.rc == 0
+        fail_msg: "pyvmomi library not found. Run: pip install -r requirements.txt"
+        success_msg: "pyvmomi library is installed"
+
+    # Validation 5: Load and validate topology file
+    - name: Check topology file exists
+      ansible.builtin.stat:
+        path: "{{ topology_file }}"
+      register: _topology_stat
+
+    - name: Validate topology file exists
+      ansible.builtin.assert:
+        that:
+          - _topology_stat.stat.exists
+        fail_msg: "Topology file not found: {{ topology_file }}"
+        success_msg: "Topology file found: {{ topology_file }}"
+
+    - name: Load topology configuration
+      ansible.builtin.include_vars:
+        file: "{{ topology_file }}"
+        name: _topology
+
+    # Validation 6: Validate topology structure
+    - name: Validate topology has required fields
+      ansible.builtin.assert:
+        that:
+          - _topology.esxi_hosts is defined
+          - _topology.vcenter_vms is defined
+          - _topology.esxi_hosts | length > 0
+          - _topology.vcenter_vms | length > 0
+        fail_msg: "Topology file must define esxi_hosts and vcenter_vms with at least one entry each"
+        success_msg: "Topology structure validated"
+
+    # Validation 7: Validate parent vCenter connection
+    - name: Check parent vCenter connection variables
+      ansible.builtin.assert:
+        that:
+          - vsphere_parent_vcenter is defined
+          - vsphere_parent_vcenter.hostname is defined
+          - vsphere_parent_vcenter.username is defined
+          - vsphere_parent_vcenter.password is defined
+        fail_msg: "Parent vCenter connection not configured. Check group_vars/all/connection.yml or environment variables"
+        success_msg: "Parent vCenter connection variables configured"
+
+    - name: Test parent vCenter connectivity
+      community.vmware.vmware_about_info:
+        hostname: "{{ vsphere_parent_vcenter.hostname }}"
+        username: "{{ vsphere_parent_vcenter.username }}"
+        password: "{{ vsphere_parent_vcenter.password }}"
+        validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
+      register: _parent_vcenter_info
+      failed_when: false
+
+    - name: Validate parent vCenter connection
+      ansible.builtin.assert:
+        that:
+          - _parent_vcenter_info is succeeded
+        fail_msg: "Cannot connect to parent vCenter: {{ vsphere_parent_vcenter.hostname }}"
+        success_msg: "Parent vCenter connection successful ({{ _parent_vcenter_info.about_info.fullName }})"
+
+    # Validation 8: Check parent vCenter resources
+    - name: Get parent vCenter datacenter info
+      community.vmware.vmware_datacenter_info:
+        hostname: "{{ vsphere_parent_vcenter.hostname }}"
+        username: "{{ vsphere_parent_vcenter.username }}"
+        password: "{{ vsphere_parent_vcenter.password }}"
+        validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
+      register: _parent_datacenters
+
+    - name: Validate parent datacenter exists
+      ansible.builtin.assert:
+        that:
+          - _parent_datacenters.datacenter_info | length > 0
+          - vsphere_parent_vcenter.datacenter in (_parent_datacenters.datacenter_info | map(attribute='name') | list)
+        fail_msg: "Parent datacenter '{{ vsphere_parent_vcenter.datacenter }}' not found in parent vCenter"
+        success_msg: "Parent datacenter '{{ vsphere_parent_vcenter.datacenter }}' exists"
+      when: vsphere_parent_vcenter.datacenter is defined
+
+    # Validation 9: Check for OVA/OVF files
+    - name: Check ESXi OVA availability
+      block:
+        - name: Get default asset configuration
+          ansible.builtin.set_fact:
+            _default_asset: "{{ vsphere_assets | selectattr('default', 'defined') | selectattr('default', 'equalto', true) | first }}"
+
+        - name: Check ESXi OVA file or content library
+          ansible.builtin.assert:
+            that:
+              - (_topology.content_library is defined and _topology.content_library.name is defined) or
+                (_default_asset.esxi_ova_path is defined)
+            fail_msg: "ESXi OVA source not configured (need content_library or esxi_ova_path)"
+            success_msg: "ESXi OVA source configured"
+
+        - name: Check vCenter OVA file or content library
+          ansible.builtin.assert:
+            that:
+              - (_topology.content_library is defined and _topology.content_library.name is defined) or
+                (_default_asset.vcenter_ova_path is defined)
+            fail_msg: "vCenter OVA source not configured (need content_library or vcenter_ova_path)"
+            success_msg: "vCenter OVA source configured"
+      when: preflight_strict_mode | bool
+
+    # Validation 10: Check for IP address conflicts
+    - name: Check for duplicate IP addresses in topology
+      ansible.builtin.assert:
+        that:
+          - (_topology.esxi_hosts | map(attribute='ip') | list) | unique | length == (_topology.esxi_hosts | length)
+        fail_msg: "Duplicate ESXi IP addresses detected in topology"
+        success_msg: "No duplicate ESXi IP addresses"
+      when: preflight_strict_mode | bool
+
+    - name: Check for duplicate vCenter IP addresses
+      ansible.builtin.assert:
+        that:
+          - (_topology.vcenter_vms | map(attribute='ip') | list) | unique | length == (_topology.vcenter_vms | length)
+        fail_msg: "Duplicate vCenter IP addresses detected in topology"
+        success_msg: "No duplicate vCenter IP addresses"
+      when: preflight_strict_mode | bool
+
+    # Validation 11: Check VM naming conflicts
+    - name: Check for VM name conflicts in parent vCenter
+      block:
+        - name: Get all VMs in parent vCenter
+          community.vmware.vmware_vm_info:
+            hostname: "{{ vsphere_parent_vcenter.hostname }}"
+            username: "{{ vsphere_parent_vcenter.username }}"
+            password: "{{ vsphere_parent_vcenter.password }}"
+            validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
+          register: _parent_vms
+
+        - name: Check for ESXi VM name conflicts
+          ansible.builtin.assert:
+            that:
+              - item.name not in (_parent_vms.virtual_machines | map(attribute='guest_name') | list)
+            fail_msg: "VM name conflict detected: {{ item.name }} already exists in parent vCenter"
+            success_msg: "No VM name conflicts for {{ item.name }}"
+          loop: "{{ _topology.esxi_hosts }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Check for vCenter VM name conflicts
+          ansible.builtin.assert:
+            that:
+              - item.name not in (_parent_vms.virtual_machines | map(attribute='guest_name') | list)
+            fail_msg: "VM name conflict detected: {{ item.name }} already exists in parent vCenter"
+            success_msg: "No VM name conflicts for {{ item.name }}"
+          loop: "{{ _topology.vcenter_vms }}"
+          loop_control:
+            label: "{{ item.name }}"
+      when: preflight_strict_mode | bool
+
+    # Validation 12: Validate resource requirements
+    - name: Calculate total resource requirements
+      ansible.builtin.set_fact:
+        _total_cpu: "{{ (_topology.esxi_hosts | sum(attribute='cpu') | default(0)) + (_topology.vcenter_vms | sum(attribute='cpu') | default(0)) }}"
+        _total_memory: "{{ (_topology.esxi_hosts | sum(attribute='memory_mb') | default(0)) + (_topology.vcenter_vms | sum(attribute='memory_mb') | default(0)) }}"
+        _total_disk: "{{ (_topology.esxi_hosts | sum(attribute='disk_gb') | default(0)) + (_topology.vcenter_vms | sum(attribute='disk_gb') | default(0)) }}"
+
+    - name: Display resource requirements
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Resource Requirements Summary"
+          - "=========================================="
+          - "Total vCPUs: {{ _total_cpu }}"
+          - "Total Memory: {{ _total_memory }} MB ({{ (_total_memory / 1024) | round(1) }} GB)"
+          - "Total Disk: {{ _total_disk }} GB"
+          - "ESXi VMs: {{ _topology.esxi_hosts | length }}"
+          - "vCenter VMs: {{ _topology.vcenter_vms | length }}"
+          - "=========================================="
+
+    # Validation 13: Check vault file
+    - name: Check for vault file
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../group_vars/all/vault.yml"
+      register: _vault_stat
+
+    - name: Validate vault file exists
+      ansible.builtin.debug:
+        msg: "WARNING: vault.yml not found. Ensure credentials are provided via environment variables or other means."
+      when: not _vault_stat.stat.exists
+
+    # Validation 14: Check state directory
+    - name: Ensure state directory exists
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../state"
+        state: directory
+        mode: '0755'
+
+  post_tasks:
+    - name: Preflight summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Preflight Validation Complete"
+          - "=========================================="
+          - "✓ Ansible version: {{ ansible_version.full }}"
+          - "✓ Python version: {{ ansible_python_version }}"
+          - "✓ Collections: Installed"
+          - "✓ Parent vCenter: {{ vsphere_parent_vcenter.hostname }}"
+          - "✓ Topology file: {{ topology_file }}"
+          - "✓ Resource requirements calculated"
+          - "=========================================="
+          - "Ready to deploy!"
+          - "Run: ansible-playbook playbooks/deploy_nested_vsphere.yml -e topology_file={{ topology_file }}"
+          - "=========================================="

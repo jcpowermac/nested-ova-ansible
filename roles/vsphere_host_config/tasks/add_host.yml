@@ -1,0 +1,27 @@
+---
+# Add ESXi host to vCenter cluster with retry logic
+
+- name: "Host {{ esxi_host.hostname }} - Add to cluster {{ esxi_host.cluster }}"
+  community.vmware.vmware_host:
+    hostname: "{{ vsphere_host_config_vcenter.hostname }}"
+    username: "{{ vsphere_host_config_vcenter.username }}"
+    password: "{{ vsphere_host_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_host_config_vcenter.validate_certs }}"
+    datacenter: "{{ esxi_host.datacenter }}"
+    cluster: "{{ esxi_host.cluster }}"
+    esxi_hostname: "{{ esxi_host.hostname }}"
+    esxi_username: "{{ esxi_host.username | default(vsphere_host_config_esxi_credentials.username) }}"
+    esxi_password: "{{ esxi_host.password | default(vsphere_host_config_esxi_credentials.password) }}"
+    state: present
+  retries: "{{ vsphere_host_config_retry_count }}"
+  delay: "{{ vsphere_host_config_retry_delay }}"
+  register: _add_host_result
+  until: _add_host_result is succeeded
+  failed_when:
+    - _add_host_result is failed
+    - not (_add_host_result.msg is defined and (_add_host_result.msg is search("already exists") or _add_host_result.msg is search("already a member")))
+
+- name: "Host {{ esxi_host.hostname }} - Log addition result"
+  ansible.builtin.debug:
+    msg: "Host {{ esxi_host.hostname }} added to cluster {{ esxi_host.cluster }} in {{ esxi_host.datacenter }}"
+  when: vsphere_host_config_debug

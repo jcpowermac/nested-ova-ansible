@@ -1,0 +1,379 @@
+---
+# Example: HostGroup Affinity Topology
+#
+# This topology uses DRS Host Groups to enforce strict zone affinity.
+# Suitable for:
+#   - Strict failure domain isolation
+#   - OpenShift deployments requiring zone-pinned workloads
+#   - Testing zone-specific failures
+#
+# Key difference from multi-FD:
+#   - zone_type: HostGroup creates DRS host groups
+#   - Each zone has specific ESXi hosts assigned
+#   - OpenShift can pin VMs to specific zones via host groups
+#
+# Resources:
+#   - 9 ESXi hosts (3 per zone)
+#   - 1 vCenter
+#   - 1 Datacenter with 1 Cluster
+#   - 3 Failure Domains with HostGroup zone type
+#   - 3 DRS Host Groups (one per zone)
+
+deployment_name: hostgroup-lab
+region: us-west-1
+
+# ESXi Host Configuration (3 hosts per zone = 9 total)
+esxi_hosts:
+  # Zone A hosts
+  - name: esxi-a1
+    ip: 192.168.1.10
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304  # 96 GB
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-a2
+    ip: 192.168.1.11
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-a3
+    ip: 192.168.1.12
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  # Zone B hosts
+  - name: esxi-b1
+    ip: 192.168.1.20
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-b2
+    ip: 192.168.1.21
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-b3
+    ip: 192.168.1.22
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  # Zone C hosts
+  - name: esxi-c1
+    ip: 192.168.1.30
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-c2
+    ip: 192.168.1.31
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-c3
+    ip: 192.168.1.32
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+# vCenter Configuration
+vcenter_vms:
+  - name: vcsa01
+    hostname: vcsa01.lab.local
+    ip: 192.168.1.5
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    dns: 192.168.1.1
+    domain: lab.local
+    ntp: pool.ntp.org
+    cpu: 16
+    memory_mb: 49152  # 48 GB (larger cluster)
+    disk_gb: 400
+    username: administrator@vsphere.local
+    password: "{{ vault_vcenter_password }}"
+    sso_domain: vsphere.local
+    datacenter: dc1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+    datacenters:
+      - name: dc1
+        clusters:
+          - name: cluster1
+            drs_enabled: true
+            drs_vmotion_rate: 3
+            drs_default_vm_behavior: fullyAutomated
+            ha_enabled: true
+            ha_admission_control: true
+            ha_host_monitoring: enabled
+            ha_vm_monitoring: vmMonitoringOnly
+
+    dvswitches:
+      - name: dvSwitch
+        datacenter: dc1
+        version: 7.0.0
+        mtu: 1500
+        uplinks: 2
+        discovery_protocol: lldp
+        discovery_operation: listen
+        port_groups:
+          - name: VM Network
+            vlan: 0
+            num_ports: 256
+          - name: Storage Network
+            vlan: 100
+            num_ports: 128
+
+    esxi_hosts:
+      # Zone A
+      - hostname: 192.168.1.10
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.11
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.12
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      # Zone B
+      - hostname: 192.168.1.20
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.21
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.22
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      # Zone C
+      - hostname: 192.168.1.30
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.31
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: 192.168.1.32
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+
+content_library:
+  name: nested-vsphere-templates
+  description: OVA templates for nested vSphere deployment
+  datastore: "{{ vsphere_parent_vcenter.datastore }}"
+  esxi_template_item: Nested_ESXi8.0u2c_Appliance_Template_v1
+  vcenter_template_item: VMware-vCenter-Server-Appliance-8.0.2.00100
+
+# Failure Domains with HostGroup Configuration
+# IMPORTANT: zone_type: HostGroup creates DRS host groups for strict zone affinity
+failure_domains:
+  - name: zone-a
+    region: us-west-1
+    zone: zone-a
+    zone_type: HostGroup  # This creates a DRS host group
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: vcsa01.lab.local
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    # ESXi hosts that belong to this zone's host group
+    hosts:
+      - 192.168.1.10
+      - 192.168.1.11
+      - 192.168.1.12
+    # Optional: Zone-specific NFS datastore
+    nfs_datastores:
+      - datastore_name: nfs-zone-a
+        nfs_server: 192.168.1.100
+        nfs_path: /export/zone-a
+        nfs_version: 3
+        esxi_hostname: 192.168.1.10
+
+  - name: zone-b
+    region: us-west-1
+    zone: zone-b
+    zone_type: HostGroup
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: vcsa01.lab.local
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    hosts:
+      - 192.168.1.20
+      - 192.168.1.21
+      - 192.168.1.22
+    nfs_datastores:
+      - datastore_name: nfs-zone-b
+        nfs_server: 192.168.1.100
+        nfs_path: /export/zone-b
+        nfs_version: 3
+        esxi_hostname: 192.168.1.20
+
+  - name: zone-c
+    region: us-west-1
+    zone: zone-c
+    zone_type: HostGroup
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: vcsa01.lab.local
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    hosts:
+      - 192.168.1.30
+      - 192.168.1.31
+      - 192.168.1.32
+    nfs_datastores:
+      - datastore_name: nfs-zone-c
+        nfs_server: 192.168.1.100
+        nfs_path: /export/zone-c
+        nfs_version: 3
+        esxi_hostname: 192.168.1.30
+
+# How HostGroup topology works:
+# 1. vsphere_host_groups role creates DRS host groups (zone-a, zone-b, zone-c)
+# 2. Each host group contains the ESXi hosts listed in the 'hosts' field
+# 3. vsphere_tagging role creates zone tags and attaches them to the host groups
+# 4. OpenShift uses these host groups to enforce VM placement in specific zones
+# 5. VMs tagged with "zone-a" will only run on hosts in the zone-a DRS host group
+
+wait_for_ip: true
+vm_wait_timeout: 1200  # 20 minutes (larger deployment)
+vsphere_debug_mode: false

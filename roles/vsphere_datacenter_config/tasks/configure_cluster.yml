@@ -1,0 +1,71 @@
+---
+# Configure cluster with DRS, HA, and resource pools
+
+- name: "Cluster {{ cluster.name }} - Create cluster in {{ datacenter.name }}"
+  community.vmware.vmware_cluster:
+    hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
+    username: "{{ vsphere_datacenter_config_vcenter.username }}"
+    password: "{{ vsphere_datacenter_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_datacenter_config_vcenter.validate_certs }}"
+    datacenter_name: "{{ datacenter.name }}"
+    cluster_name: "{{ cluster.name }}"
+    state: present
+
+- name: "Cluster {{ cluster.name }} - Enable DRS"
+  community.vmware.vmware_cluster_drs:
+    hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
+    username: "{{ vsphere_datacenter_config_vcenter.username }}"
+    password: "{{ vsphere_datacenter_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_datacenter_config_vcenter.validate_certs }}"
+    datacenter_name: "{{ datacenter.name }}"
+    cluster_name: "{{ cluster.name }}"
+    enable: "{{ cluster.drs_enabled | default(vsphere_datacenter_config_drs_enabled) }}"
+    drs_default_vm_behavior: "{{ cluster.drs_behavior | default(vsphere_datacenter_config_drs_behavior) }}"
+    drs_vmotion_rate: "{{ cluster.drs_vmotion_rate | default(vsphere_datacenter_config_drs_vmotion_rate) }}"
+  when: cluster.drs_enabled | default(vsphere_datacenter_config_drs_enabled) | bool
+
+- name: "Cluster {{ cluster.name }} - Enable HA"
+  community.vmware.vmware_cluster_ha:
+    hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
+    username: "{{ vsphere_datacenter_config_vcenter.username }}"
+    password: "{{ vsphere_datacenter_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_datacenter_config_vcenter.validate_certs }}"
+    datacenter_name: "{{ datacenter.name }}"
+    cluster_name: "{{ cluster.name }}"
+    enable: "{{ cluster.ha_enabled | default(vsphere_datacenter_config_ha_enabled) }}"
+    ha_admission_control_enabled: "{{ cluster.ha_admission_control_enabled | default(vsphere_datacenter_config_ha_admission_control_enabled) }}"
+    ha_host_monitoring: "{{ cluster.ha_host_monitoring | default(vsphere_datacenter_config_ha_host_monitoring) }}"
+    ha_vm_monitoring: "{{ cluster.ha_vm_monitoring | default(vsphere_datacenter_config_ha_vm_monitoring) }}"
+    advanced_settings: "{{ cluster.ha_advanced_settings | default(vsphere_datacenter_config_ha_advanced_settings) }}"
+  when: cluster.ha_enabled | default(vsphere_datacenter_config_ha_enabled) | bool
+  register: _ha_result
+  failed_when: false  # Don't fail if HA config has issues
+
+- name: "Cluster {{ cluster.name }} - Log HA configuration warning"
+  ansible.builtin.debug:
+    msg: "WARNING: HA configuration failed for {{ cluster.name }}: {{ _ha_result.msg | default('Unknown error') }}"
+  when:
+    - _ha_result is defined
+    - _ha_result is failed
+
+- name: "Cluster {{ cluster.name }} - Create resource pool"
+  community.vmware.vmware_resource_pool:
+    hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
+    username: "{{ vsphere_datacenter_config_vcenter.username }}"
+    password: "{{ vsphere_datacenter_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_datacenter_config_vcenter.validate_certs }}"
+    datacenter: "{{ datacenter.name }}"
+    cluster: "{{ cluster.name }}"
+    resource_pool: "{{ cluster.resource_pool }}"
+    cpu_shares: "{{ cluster.resource_pool_cpu_shares | default(vsphere_datacenter_config_resource_pool_cpu_shares) }}"
+    mem_shares: "{{ cluster.resource_pool_mem_shares | default(vsphere_datacenter_config_resource_pool_mem_shares) }}"
+    state: present
+  when:
+    - vsphere_datacenter_config_create_resource_pools
+    - cluster.resource_pool is defined
+    - cluster.resource_pool | length > 0
+
+- name: "Cluster {{ cluster.name }} - Log cluster configuration complete"
+  ansible.builtin.debug:
+    msg: "Cluster {{ cluster.name }} in {{ datacenter.name }} configured successfully"
+  when: vsphere_datacenter_config_debug

@@ -1,0 +1,53 @@
+---
+# Main tasks for vsphere_vm_deploy role
+
+- name: Validate parent vCenter connection parameters
+  ansible.builtin.assert:
+    that:
+      - vsphere_vm_deploy_parent_vcenter.hostname is defined
+      - vsphere_vm_deploy_parent_vcenter.hostname | length > 0
+      - vsphere_vm_deploy_parent_vcenter.username is defined
+      - vsphere_vm_deploy_parent_vcenter.password is defined
+    fail_msg: "Parent vCenter connection parameters must be defined"
+    quiet: true
+
+- name: Log deployment start
+  ansible.builtin.debug:
+    msg: "{{ 'Starting VM deployment' | deployment_log('INFO', {'esxi_count': vsphere_vm_deploy_esxi_hosts | length, 'vcenter_count': vsphere_vm_deploy_vcenter_vms | length}) }}"
+  when: vsphere_vm_deploy_logging_enabled
+
+- name: Deploy ESXi VMs
+  ansible.builtin.include_tasks:
+    file: deploy_esxi.yml
+  loop: "{{ vsphere_vm_deploy_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    index_var: esxi_index
+    label: "{{ esxi_host.name }}"
+  when: vsphere_vm_deploy_esxi_hosts | length > 0
+
+- name: Deploy vCenter VMs
+  ansible.builtin.include_tasks:
+    file: deploy_vcenter.yml
+  loop: "{{ vsphere_vm_deploy_vcenter_vms }}"
+  loop_control:
+    loop_var: vcenter_vm
+    index_var: vcenter_index
+    label: "{{ vcenter_vm.name }}"
+  when: vsphere_vm_deploy_vcenter_vms | length > 0
+
+- name: Retrieve vCenter certificates
+  ansible.builtin.include_tasks:
+    file: get_certificates.yml
+  loop: "{{ vsphere_vm_deploy_vcenter_vms }}"
+  loop_control:
+    loop_var: vcenter_vm
+    label: "{{ vcenter_vm.name }}"
+  when:
+    - vsphere_vm_deploy_vcenter_vms | length > 0
+    - vsphere_vm_deploy_retrieve_certificates
+
+- name: Log deployment completion
+  ansible.builtin.debug:
+    msg: "{{ 'VM deployment completed successfully' | deployment_log('INFO', {'esxi_deployed': vsphere_vm_deploy_esxi_hosts | length, 'vcenter_deployed': vsphere_vm_deploy_vcenter_vms | length}) }}"
+  when: vsphere_vm_deploy_logging_enabled

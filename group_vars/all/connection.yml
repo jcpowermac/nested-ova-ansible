@@ -1,0 +1,19 @@
+---
+# Parent vCenter Connection Configuration
+# These settings define how to connect to the physical vCenter where nested VMs will be deployed
+
+# Parent vCenter hostname - can be overridden via environment variables
+parent_vcenter_hostname: "{{ lookup('ansible.builtin.env', 'GOVC_URL') | default('vcenter.example.com') }}"
+parent_vcenter_username: "{{ lookup('ansible.builtin.env', 'GOVC_USERNAME') | default('administrator@vsphere.local') }}"
+parent_vcenter_password: "{{ lookup('ansible.builtin.env', 'GOVC_PASSWORD') | default(vault_parent_vcenter_password | default('')) }}"
+
+# Parent vCenter resources where nested VMs will be deployed
+parent_vcenter_datacenter: "{{ lookup('ansible.builtin.env', 'GOVC_DATACENTER') | default('Datacenter') }}"
+parent_vcenter_datastore: "{{ lookup('ansible.builtin.env', 'GOVC_DATASTORE') | default('datastore1') }}"
+parent_vcenter_cluster: "{{ lookup('ansible.builtin.env', 'GOVC_CLUSTER') | default('Cluster') }}"
+parent_vcenter_network: "{{ lookup('ansible.builtin.env', 'GOVC_NETWORK') | default('VM Network') }}"
+parent_vcenter_folder: "{{ lookup('ansible.builtin.env', 'GOVC_FOLDER') | default('nested') }}"
+
+# Connection settings
+parent_vcenter_validate_certs: false
+parent_vcenter_port: 443

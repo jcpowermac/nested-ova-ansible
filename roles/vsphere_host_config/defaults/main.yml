@@ -1,0 +1,55 @@
+---
+# vsphere_host_config role defaults
+
+# vCenter connection details
+vsphere_host_config_vcenter:
+  hostname: ""
+  username: "administrator@vsphere.local"
+  password: ""
+  validate_certs: false
+
+# ESXi hosts to add to vCenter
+# Structure:
+# vsphere_host_config_esxi_hosts:
+#   - hostname: "192.168.1.10"
+#     datacenter: "dc1"
+#     cluster: "cluster1"
+#     username: "root"
+#     password: "password"
+vsphere_host_config_esxi_hosts: []
+
+# ESXi credentials
+vsphere_host_config_esxi_credentials:
+  username: "root"
+  password: ""
+
+# Power management policy
+vsphere_host_config_power_policy: "high-performance"  # low-power, balanced, high-performance, custom
+
+# Auto-start configuration
+vsphere_host_config_enable_auto_start: true
+vsphere_host_config_auto_start_delay: 100
+vsphere_host_config_auto_stop_action: "guestShutdown"  # none, suspend, powerOff, guestShutdown
+vsphere_host_config_auto_wait_for_heartbeat: true
+
+# vMotion configuration
+vsphere_host_config_enable_vmotion: true
+vsphere_host_config_vmotion_vswitch: "vSwitch0"
+vsphere_host_config_vmotion_portgroup: "Management Network"
+vsphere_host_config_vmotion_device: "vmk0"
+vsphere_host_config_vmotion_network_type: "dhcp"  # dhcp or static
+
+# Storage configuration
+vsphere_host_config_rescan_hba: true
+vsphere_host_config_refresh_storage: true
+
+# Maintenance mode
+vsphere_host_config_exit_maintenance_mode: true
+vsphere_host_config_maintenance_timeout: 3600
+
+# Retry settings for adding hosts (important as this can be flaky)
+vsphere_host_config_retry_count: 3
+vsphere_host_config_retry_delay: 30
+
+# Debug logging
+vsphere_host_config_debug: "{{ enable_debug_mode | default(false) }}"

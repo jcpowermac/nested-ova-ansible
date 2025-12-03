@@ -1,0 +1,48 @@
+---
+# vsphere_networking role defaults
+
+# vCenter connection
+vsphere_networking_vcenter:
+  hostname: ""
+  username: "administrator@vsphere.local"
+  password: ""
+  validate_certs: false
+
+# Distributed vSwitch configuration
+# Structure:
+# vsphere_networking_dvswitches:
+#   - name: "dvSwitch-dc1"
+#     datacenter: "dc1"
+#     version: "7.0.0"
+#     mtu: 9000
+#     uplink_quantity: 1
+vsphere_networking_dvswitches: []
+
+# Port groups to create
+# Structure:
+# vsphere_networking_portgroups:
+#   - name: "VM Network"
+#     switch_name: "dvSwitch-dc1"
+#     vlan_id: 0
+#     num_ports: 120
+#     port_binding: "static"
+vsphere_networking_portgroups: []
+
+# ESXi hosts to add to dvSwitch
+vsphere_networking_esxi_hosts: []
+
+# NICs to add to dvSwitch
+vsphere_networking_host_nics:
+  - vmnic1
+
+# Default dvSwitch settings
+vsphere_networking_default_version: "{{ default_dvswitch_version | default('7.0.0') }}"
+vsphere_networking_default_mtu: "{{ default_dvswitch_mtu | default(9000) }}"
+vsphere_networking_default_uplink_quantity: "{{ default_uplink_quantity | default(1) }}"
+
+# Pause after operations (dvSwitch needs time to propagate)
+vsphere_networking_pause_after_dvs_create: 10
+vsphere_networking_pause_after_host_add: 10
+
+# Debug logging
+vsphere_networking_debug: "{{ enable_debug_mode | default(false) }}"

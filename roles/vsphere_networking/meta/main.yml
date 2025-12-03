@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  role_name: vsphere_networking
+  author: OpenShift SPLAT Team
+  description: Configure vSphere distributed vSwitch and port groups
+  company: Red Hat
+  license: Apache-2.0
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - vsphere
+    - vmware
+    - networking
+    - dvswitch
+    - portgroup
+
+dependencies: []
+
+collections:
+  - community.vmware

@@ -1,0 +1,97 @@
+---
+# Main tasks for vsphere_tagging role
+
+- name: Skip tagging if disabled
+  ansible.builtin.debug:
+    msg: "Tagging is disabled, skipping"
+  when: not vsphere_tagging_enabled
+
+- name: Execute tagging tasks
+  when: vsphere_tagging_enabled
+  block:
+    - name: Validate vCenter connection
+      ansible.builtin.assert:
+        that:
+          - vsphere_tagging_vcenter.hostname is defined
+          - vsphere_tagging_vcenter.password is defined
+        fail_msg: "vCenter connection required"
+        quiet: true
+
+    - name: Log tagging configuration start
+      ansible.builtin.debug:
+        msg: "{{ 'Starting tagging configuration' | deployment_log('INFO', {'vcenter': vsphere_tagging_vcenter.hostname}) }}"
+      when: vsphere_tagging_debug
+
+    - name: Create tag categories
+      community.vmware.vmware_category:
+        hostname: "{{ vsphere_tagging_vcenter.hostname }}"
+        username: "{{ vsphere_tagging_vcenter.username }}"
+        password: "{{ vsphere_tagging_vcenter.password }}"
+        validate_certs: "{{ vsphere_tagging_vcenter.validate_certs }}"
+        category_name: "{{ item.name }}"
+        category_description: "{{ item.description }}"
+        category_cardinality: "single"
+        associable_object_types: "{{ item.object_types }}"
+        state: present
+      loop:
+        - name: "{{ vsphere_tagging_region_category }}"
+          description: "Region tags for OpenShift"
+          object_types: "{{ vsphere_tagging_region_objects }}"
+        - name: "{{ vsphere_tagging_zone_category }}"
+          description: "Zone tags for OpenShift"
+          object_types: "{{ vsphere_tagging_zone_objects }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Create region tags
+      community.vmware.vmware_tag:
+        hostname: "{{ vsphere_tagging_vcenter.hostname }}"
+        username: "{{ vsphere_tagging_vcenter.username }}"
+        password: "{{ vsphere_tagging_vcenter.password }}"
+        validate_certs: "{{ vsphere_tagging_vcenter.validate_certs }}"
+        category_name: "{{ vsphere_tagging_region_category }}"
+        tag_name: "{{ fd.region }}"
+        state: present
+      loop: "{{ vsphere_tagging_failure_domains }}"
+      loop_control:
+        loop_var: fd
+        label: "{{ fd.region }}"
+      when: fd.region is defined and not fd.region.startswith('-')
+
+    - name: Create zone tags
+      community.vmware.vmware_tag:
+        hostname: "{{ vsphere_tagging_vcenter.hostname }}"
+        username: "{{ vsphere_tagging_vcenter.username }}"
+        password: "{{ vsphere_tagging_vcenter.password }}"
+        validate_certs: "{{ vsphere_tagging_vcenter.validate_certs }}"
+        category_name: "{{ vsphere_tagging_zone_category }}"
+        tag_name: "{{ fd.zone }}"
+        state: present
+      loop: "{{ vsphere_tagging_failure_domains }}"
+      loop_control:
+        loop_var: fd
+        label: "{{ fd.zone }}"
+      when: fd.zone is defined and not fd.zone.startswith('-')
+
+    - name: Attach region tags
+      ansible.builtin.include_tasks:
+        file: attach_region_tags.yml
+      loop: "{{ vsphere_tagging_failure_domains }}"
+      loop_control:
+        loop_var: fd
+        label: "{{ fd.region }}"
+      when: fd.region is defined and not fd.region.startswith('-')
+
+    - name: Attach zone tags
+      ansible.builtin.include_tasks:
+        file: attach_zone_tags.yml
+      loop: "{{ vsphere_tagging_failure_domains }}"
+      loop_control:
+        loop_var: fd
+        label: "{{ fd.zone }}"
+      when: fd.zone is defined and not fd.zone.startswith('-')
+
+    - name: Log tagging configuration complete
+      ansible.builtin.debug:
+        msg: "{{ 'Tagging configuration completed' | deployment_log('INFO', {'failure_domains': vsphere_tagging_failure_domains | length}) }}"
+      when: vsphere_tagging_debug

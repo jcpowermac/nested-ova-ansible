@@ -1,0 +1,49 @@
+---
+# Main tasks for vsphere_host_groups role
+
+- name: Skip host groups if disabled
+  ansible.builtin.debug:
+    msg: "Host groups are disabled, skipping"
+  when: not vsphere_host_groups_enabled
+
+- name: Execute host groups configuration
+  when: vsphere_host_groups_enabled
+  block:
+    - name: Validate vCenter connection
+      ansible.builtin.assert:
+        that:
+          - vsphere_host_groups_vcenter.hostname is defined
+          - vsphere_host_groups_vcenter.password is defined
+        fail_msg: "vCenter connection required"
+        quiet: true
+
+    - name: Filter failure domains for HostGroup type
+      ansible.builtin.set_fact:
+        _host_group_failure_domains: "{{ vsphere_host_groups_failure_domains | selectattr('zone_type', 'defined') | selectattr('zone_type', 'equalto', 'HostGroup') | list }}"
+
+    - name: Log host groups configuration start
+      ansible.builtin.debug:
+        msg: "{{ 'Starting host groups configuration' | deployment_log('INFO', {'host_groups': _host_group_failure_domains | length}) }}"
+      when: vsphere_host_groups_debug
+
+    - name: Create DRS host groups
+      community.vmware.vmware_drs_group:
+        hostname: "{{ vsphere_host_groups_vcenter.hostname }}"
+        username: "{{ vsphere_host_groups_vcenter.username }}"
+        password: "{{ vsphere_host_groups_vcenter.password }}"
+        validate_certs: "{{ vsphere_host_groups_vcenter.validate_certs }}"
+        cluster_name: "{{ fd.cluster }}"
+        datacenter_name: "{{ fd.datacenter }}"
+        group_name: "{{ fd.name }}"
+        hosts: "{{ fd.hosts }}"
+        state: present
+      loop: "{{ _host_group_failure_domains }}"
+      loop_control:
+        loop_var: fd
+        label: "{{ fd.name }}"
+      when: _host_group_failure_domains | length > 0
+
+    - name: Log host groups configuration complete
+      ansible.builtin.debug:
+        msg: "{{ 'Host groups configuration completed' | deployment_log('INFO', {'groups_created': _host_group_failure_domains | length}) }}"
+      when: vsphere_host_groups_debug

@@ -1,0 +1,90 @@
+---
+# Ansible-lint configuration
+
+# Exclude paths
+exclude_paths:
+  - .github/
+  - .ansible/
+  - .venv/
+  - venv/
+  - .molecule/
+  - .cache/
+  - tests/vcsim/
+  - sim_shared_dir/
+  - state/
+
+# Enable checking of loop variable prefixes in roles
+loop_var_prefix: "{role}_"
+
+# Enforce variable naming patterns
+var_naming_pattern: "^[a-z_][a-z0-9_]*$"
+
+# Use default rules set
+profile: production
+
+# Skip specific rules (with justification)
+skip_list:
+  # Allow using command instead of module when necessary
+  # - command-instead-of-module
+
+  # Allow using shell when necessary for complex commands
+  # - command-instead-of-shell
+
+  # Temporary: Skip no-changed-when during development
+  # Remove this before production release
+  - no-changed-when
+
+  # Temporary: Skip name rules for legacy code during migration
+  # - name[missing]
+  # - name[play]
+  # - name[casing]
+
+# Enable specific rules
+enable_list:
+  - args
+  - empty-string-compare
+  - no-log-password
+  - no-same-owner
+  - yaml
+
+# Warn instead of error for these rules
+warn_list:
+  - experimental
+  - ignore-errors
+  - no-handler
+  - fqcn-builtins
+
+# Set ansible and collections versions for linting
+# This helps catch deprecations and compatibility issues
+offline: false
+
+# Use YAML-specific settings
+kinds:
+  - yaml: "*.yaml"
+  - yaml: "*.yml"
+  - playbook: "**/playbooks/*.yml"
+  - playbook: "**/playbooks/*.yaml"
+  - tasks: "**/tasks/*.yml"
+  - tasks: "**/tasks/*.yaml"
+  - handlers: "**/handlers/*.yml"
+  - vars: "**/vars/*.yml"
+  - vars: "**/group_vars/*.yml"
+  - vars: "**/host_vars/*.yml"
+  - defaults: "**/defaults/*.yml"
+  - meta: "**/meta/*.yml"
+
+# Mock modules and roles for linting
+mock_modules:
+  - community.vmware.vmware_guest
+  - community.vmware.vmware_datacenter
+  - community.vmware.vmware_cluster
+  - vmware.vmware.deploy_content_library_ovf
+
+mock_roles:
+  - vsphere_vm_deploy
+  - vsphere_datacenter_config
+  - vsphere_host_config
+  - vsphere_networking
+  - vsphere_storage
+  - vsphere_tagging
+  - vsphere_host_groups

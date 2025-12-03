@@ -1,0 +1,348 @@
+---
+# Destroy playbook for nested vSphere environment
+# Removes all resources created by deploy_nested_vsphere.yml
+
+- name: Destroy Nested vSphere Environment
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # Load deployment state or topology file
+    deployment_name: "{{ lookup('env', 'DEPLOYMENT_NAME') | default('nested-vsphere', true) }}"
+    state_file: "{{ playbook_dir }}/../state/{{ deployment_name }}_deployment.yml"
+    topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
+
+    # Destroy mode: 'soft' removes config but keeps VMs, 'hard' removes everything
+    destroy_mode: "{{ lookup('env', 'DESTROY_MODE') | default('hard', true) }}"
+
+  pre_tasks:
+    - name: Check for deployment state file
+      ansible.builtin.stat:
+        path: "{{ state_file }}"
+      register: _state_file_stat
+
+    - name: Load deployment state if available
+      ansible.builtin.include_vars:
+        file: "{{ state_file }}"
+        name: _deployment
+      when: _state_file_stat.stat.exists
+
+    - name: Load topology file as fallback
+      ansible.builtin.include_vars:
+        file: "{{ topology_file }}"
+        name: _topology
+      when: not _state_file_stat.stat.exists
+
+    - name: Set deployment variables from state or topology
+      ansible.builtin.set_fact:
+        _deployment_config: "{{ _deployment if _state_file_stat.stat.exists else _topology }}"
+
+    - name: Display destroy information
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "WARNING: Destructive Operation"
+          - "=========================================="
+          - "Deployment Name: {{ deployment_name }}"
+          - "Destroy Mode: {{ destroy_mode }}"
+          - "ESXi Hosts to Remove: {{ _deployment_config.esxi_hosts | default([]) | length }}"
+          - "vCenters to Remove: {{ _deployment_config.vcenter_vms | default([]) | length }}"
+          - "=========================================="
+          - "This will {{ 'remove all VMs' if destroy_mode == 'hard' else 'remove configuration only' }}"
+          - "=========================================="
+
+    - name: Confirm destruction
+      ansible.builtin.pause:
+        prompt: "Type 'yes' to confirm destruction, or Ctrl+C to abort"
+      register: _destroy_confirm
+      when: vsphere_interactive_mode | default(true) | bool
+
+    - name: Validate confirmation
+      ansible.builtin.fail:
+        msg: "Destruction aborted - confirmation not received"
+      when:
+        - vsphere_interactive_mode | default(true) | bool
+        - _destroy_confirm.user_input | default('') != 'yes'
+
+  tasks:
+    # Phase 1: Remove DRS Host Groups
+    - name: "Phase 1: Remove DRS Host Groups"
+      community.vmware.vmware_drs_group:
+        hostname: "{{ item.hostname }}"
+        username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+        password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+        validate_certs: "{{ item.validate_certs | default(false) }}"
+        cluster_name: "{{ fd.cluster }}"
+        datacenter_name: "{{ fd.datacenter }}"
+        group_name: "{{ fd.name }}"
+        state: absent
+      loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.hostname }}"
+      when:
+        - _deployment_config.failure_domains | default([]) | length > 0
+        - destroy_mode in ['soft', 'hard']
+      with_subelements:
+        - "{{ [item] }}"
+        - "{{ _deployment_config.failure_domains | selectattr('zone_type', 'defined') | selectattr('zone_type', 'equalto', 'HostGroup') | list }}"
+      loop_control:
+        loop_var: fd
+      failed_when: false
+      ignore_errors: true
+
+    # Phase 2: Remove OpenShift Tags
+    - name: "Phase 2: Remove OpenShift Tags"
+      block:
+        - name: Remove zone tags
+          community.vmware.vmware_tag:
+            hostname: "{{ item.hostname }}"
+            username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+            password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+            validate_certs: "{{ item.validate_certs | default(false) }}"
+            tag_name: "{{ fd.zone }}"
+            category_id: "{{ 'openshift-zone' }}"
+            state: absent
+          loop: "{{ _deployment_config.failure_domains | default([]) }}"
+          loop_control:
+            loop_var: fd
+            label: "{{ fd.zone }}"
+          failed_when: false
+          ignore_errors: true
+
+        - name: Remove region tags
+          community.vmware.vmware_tag:
+            hostname: "{{ item.hostname }}"
+            username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+            password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+            validate_certs: "{{ item.validate_certs | default(false) }}"
+            tag_name: "{{ _deployment_config.region | default('region-1') }}"
+            category_id: "{{ 'openshift-region' }}"
+            state: absent
+          loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+          loop_control:
+            loop_var: item
+            label: "{{ item.hostname }}"
+          failed_when: false
+          ignore_errors: true
+
+        - name: Remove tag categories
+          community.vmware.vmware_category:
+            hostname: "{{ item.hostname }}"
+            username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+            password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+            validate_certs: "{{ item.validate_certs | default(false) }}"
+            category_name: "{{ category }}"
+            state: absent
+          loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+          loop_control:
+            loop_var: item
+            label: "{{ item.hostname }}"
+          vars:
+            category: "{{ item.1 }}"
+          with_nested:
+            - "{{ _deployment_config.vcenter_vms | default([]) }}"
+            - ['openshift-region', 'openshift-zone']
+          failed_when: false
+          ignore_errors: true
+      when: destroy_mode in ['soft', 'hard']
+
+    # Phase 3: Remove Datastores
+    - name: "Phase 3: Remove Datastores"
+      block:
+        - name: Remove NFS datastores
+          community.vmware.vmware_host_datastore:
+            hostname: "{{ item.vcenter.hostname }}"
+            username: "{{ item.vcenter.username | default(vsphere_parent_vcenter.username) }}"
+            password: "{{ item.vcenter.password | default(vsphere_parent_vcenter.password) }}"
+            validate_certs: "{{ item.vcenter.validate_certs | default(false) }}"
+            esxi_hostname: "{{ nfs.esxi_hostname }}"
+            datastore_name: "{{ nfs.datastore_name }}"
+            datastore_type: "nfs"
+            state: absent
+          loop: "{{ _deployment_config.failure_domains | default([]) }}"
+          loop_control:
+            loop_var: item
+          with_subelements:
+            - "{{ [item] }}"
+            - nfs_datastores
+            - skip_missing: true
+          loop_control:
+            loop_var: nfs
+          failed_when: false
+          ignore_errors: true
+
+        - name: Remove VMFS datastores
+          community.vmware.vmware_host_datastore:
+            hostname: "{{ item.vcenter.hostname }}"
+            username: "{{ item.vcenter.username | default(vsphere_parent_vcenter.username) }}"
+            password: "{{ item.vcenter.password | default(vsphere_parent_vcenter.password) }}"
+            validate_certs: "{{ item.vcenter.validate_certs | default(false) }}"
+            esxi_hostname: "{{ vmfs.esxi_hostname }}"
+            datastore_name: "{{ vmfs.datastore_name }}"
+            datastore_type: "vmfs"
+            state: absent
+          loop: "{{ _deployment_config.failure_domains | default([]) }}"
+          loop_control:
+            loop_var: item
+          with_subelements:
+            - "{{ [item] }}"
+            - vmfs_datastores
+            - skip_missing: true
+          loop_control:
+            loop_var: vmfs
+          failed_when: false
+          ignore_errors: true
+      when: destroy_mode in ['soft', 'hard']
+
+    # Phase 4: Remove Distributed vSwitch
+    - name: "Phase 4: Remove Distributed vSwitch"
+      community.vmware.vmware_dvswitch:
+        hostname: "{{ item.hostname }}"
+        username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+        password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+        validate_certs: "{{ item.validate_certs | default(false) }}"
+        datacenter: "{{ dvs.datacenter }}"
+        switch: "{{ dvs.name }}"
+        state: absent
+      loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+      with_subelements:
+        - "{{ [item] }}"
+        - dvswitches
+        - skip_missing: true
+      loop_control:
+        loop_var: dvs
+      when: destroy_mode in ['soft', 'hard']
+      failed_when: false
+      ignore_errors: true
+
+    # Phase 5: Remove ESXi Hosts from vCenter
+    - name: "Phase 5: Remove ESXi Hosts from vCenter"
+      community.vmware.vmware_host:
+        hostname: "{{ item.hostname }}"
+        username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+        password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+        validate_certs: "{{ item.validate_certs | default(false) }}"
+        datacenter: "{{ esxi.datacenter }}"
+        cluster: "{{ esxi.cluster }}"
+        esxi_hostname: "{{ esxi.hostname }}"
+        state: absent
+      loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+      with_subelements:
+        - "{{ [item] }}"
+        - esxi_hosts
+        - skip_missing: true
+      loop_control:
+        loop_var: esxi
+      when: destroy_mode in ['soft', 'hard']
+      failed_when: false
+      ignore_errors: true
+
+    # Phase 6: Remove Clusters
+    - name: "Phase 6: Remove Clusters"
+      community.vmware.vmware_cluster:
+        hostname: "{{ item.hostname }}"
+        username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+        password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+        validate_certs: "{{ item.validate_certs | default(false) }}"
+        datacenter: "{{ dc.name }}"
+        cluster_name: "{{ cluster.name }}"
+        state: absent
+      loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+      with_subelements:
+        - "{{ [item] }}"
+        - datacenters
+        - skip_missing: true
+      loop_control:
+        loop_var: dc
+      with_subelements:
+        - "{{ [dc] }}"
+        - clusters
+        - skip_missing: true
+      loop_control:
+        loop_var: cluster
+      when: destroy_mode in ['soft', 'hard']
+      failed_when: false
+      ignore_errors: true
+
+    # Phase 7: Remove Datacenters
+    - name: "Phase 7: Remove Datacenters"
+      community.vmware.vmware_datacenter:
+        hostname: "{{ item.hostname }}"
+        username: "{{ item.username | default(vsphere_parent_vcenter.username) }}"
+        password: "{{ item.password | default(vsphere_parent_vcenter.password) }}"
+        validate_certs: "{{ item.validate_certs | default(false) }}"
+        datacenter_name: "{{ dc.name }}"
+        state: absent
+      loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+      with_subelements:
+        - "{{ [item] }}"
+        - datacenters
+        - skip_missing: true
+      loop_control:
+        loop_var: dc
+      when: destroy_mode in ['soft', 'hard']
+      failed_when: false
+      ignore_errors: true
+
+    # Phase 8: Remove VMs (vCenter and ESXi)
+    - name: "Phase 8: Remove Virtual Machines"
+      block:
+        - name: Power off and remove vCenter VMs
+          community.vmware.vmware_guest:
+            hostname: "{{ vsphere_parent_vcenter.hostname }}"
+            username: "{{ vsphere_parent_vcenter.username }}"
+            password: "{{ vsphere_parent_vcenter.password }}"
+            validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
+            name: "{{ item.name }}"
+            state: absent
+            force: true
+          loop: "{{ _deployment_config.vcenter_vms | default([]) }}"
+          loop_control:
+            label: "{{ item.name }}"
+          failed_when: false
+
+        - name: Power off and remove ESXi VMs
+          community.vmware.vmware_guest:
+            hostname: "{{ vsphere_parent_vcenter.hostname }}"
+            username: "{{ vsphere_parent_vcenter.username }}"
+            password: "{{ vsphere_parent_vcenter.password }}"
+            validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
+            name: "{{ item.name }}"
+            state: absent
+            force: true
+          loop: "{{ _deployment_config.esxi_hosts | default([]) }}"
+          loop_control:
+            label: "{{ item.name }}"
+          failed_when: false
+      when: destroy_mode == 'hard'
+
+  post_tasks:
+    - name: Destruction summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Nested vSphere Destruction Complete"
+          - "=========================================="
+          - "Deployment Name: {{ deployment_name }}"
+          - "Destroy Mode: {{ destroy_mode }}"
+          - "Resources Removed:"
+          - "  - ESXi VMs: {{ _deployment_config.esxi_hosts | default([]) | length if destroy_mode == 'hard' else 0 }}"
+          - "  - vCenter VMs: {{ _deployment_config.vcenter_vms | default([]) | length if destroy_mode == 'hard' else 0 }}"
+          - "  - Configuration: {{ 'Yes' if destroy_mode in ['soft', 'hard'] else 'No' }}"
+          - "=========================================="
+
+    - name: Remove deployment state file
+      ansible.builtin.file:
+        path: "{{ state_file }}"
+        state: absent
+      when:
+        - _state_file_stat.stat.exists
+        - destroy_mode == 'hard'

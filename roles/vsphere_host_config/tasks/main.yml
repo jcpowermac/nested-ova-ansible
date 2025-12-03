@@ -1,0 +1,62 @@
+---
+# Main tasks for vsphere_host_config role
+
+- name: Validate vCenter connection parameters
+  ansible.builtin.assert:
+    that:
+      - vsphere_host_config_vcenter.hostname is defined
+      - vsphere_host_config_vcenter.hostname | length > 0
+      - vsphere_host_config_vcenter.password is defined
+    fail_msg: "vCenter connection parameters must be defined"
+    quiet: true
+
+- name: Validate ESXi hosts list
+  ansible.builtin.assert:
+    that:
+      - vsphere_host_config_esxi_hosts is defined
+      - vsphere_host_config_esxi_hosts | length > 0
+    fail_msg: "ESXi hosts list must be provided"
+    quiet: true
+
+- name: Log host configuration start
+  ansible.builtin.debug:
+    msg: "{{ 'Starting host configuration' | deployment_log('INFO', {'vcenter': vsphere_host_config_vcenter.hostname, 'hosts_count': vsphere_host_config_esxi_hosts | length}) }}"
+  when: vsphere_host_config_debug
+
+- name: Add ESXi hosts to vCenter
+  ansible.builtin.include_tasks:
+    file: add_host.yml
+  loop: "{{ vsphere_host_config_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"
+
+- name: Configure power management
+  ansible.builtin.include_tasks:
+    file: configure_power_management.yml
+  when: vsphere_host_config_power_policy is defined
+
+- name: Configure auto-start settings
+  ansible.builtin.include_tasks:
+    file: configure_auto_start.yml
+  when: vsphere_host_config_enable_auto_start
+
+- name: Rescan storage
+  ansible.builtin.include_tasks:
+    file: rescan_storage.yml
+  when: vsphere_host_config_rescan_hba
+
+- name: Enable vMotion
+  ansible.builtin.include_tasks:
+    file: enable_vmotion.yml
+  when: vsphere_host_config_enable_vmotion
+
+- name: Exit maintenance mode
+  ansible.builtin.include_tasks:
+    file: exit_maintenance_mode.yml
+  when: vsphere_host_config_exit_maintenance_mode
+
+- name: Log host configuration completion
+  ansible.builtin.debug:
+    msg: "{{ 'Host configuration completed' | deployment_log('INFO', {'hosts_configured': vsphere_host_config_esxi_hosts | length}) }}"
+  when: vsphere_host_config_debug

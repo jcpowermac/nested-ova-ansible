@@ -1,0 +1,357 @@
+---
+name: CI Testing
+
+on:
+  push:
+    branches:
+      - main
+      - rewrite
+  pull_request:
+    branches:
+      - main
+      - rewrite
+
+env:
+  ANSIBLE_FORCE_COLOR: "1"
+  PYTHON_VERSION: "3.11"
+  ANSIBLE_VERSION: "2.15"
+
+jobs:
+  # Job 1: Lint all Ansible files
+  lint:
+    name: Lint Ansible Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ansible-lint yamllint
+
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install -r collections/requirements.yml
+
+      - name: Run yamllint
+        run: |
+          yamllint -c .yamllint .
+        continue-on-error: true
+
+      - name: Run ansible-lint
+        run: |
+          ansible-lint --force-color --show-relpath
+
+  # Job 2: Test each role with Molecule (delegated driver for vcsim)
+  molecule:
+    name: Molecule Test - ${{ matrix.role }}
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        role:
+          - vsphere_vm_deploy
+          - vsphere_datacenter_config
+          - vsphere_host_config
+          - vsphere_networking
+          - vsphere_storage
+          - vsphere_tagging
+          - vsphere_host_groups
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install molecule molecule-plugins[docker] ansible-lint
+
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install -r collections/requirements.yml
+
+      - name: Set up Docker for vcsim
+        run: |
+          docker --version
+
+      - name: Start vCenter Simulator (vcsim)
+        run: |
+          docker run -d --name vcsim \
+            -p 8989:8989 \
+            -e VCSIM_STANDALONE_PORT=8989 \
+            nimmis/vcsim:latest
+          # Wait for vcsim to be ready
+          sleep 10
+          curl -k https://localhost:8989/about || echo "vcsim not ready yet"
+
+      - name: Run Molecule test for ${{ matrix.role }}
+        run: |
+          cd roles/${{ matrix.role }}
+          molecule test -s default
+        env:
+          VCENTER_HOSTNAME: localhost
+          VCENTER_PORT: 8989
+          VCENTER_USERNAME: user
+          VCENTER_PASSWORD: pass
+          VCENTER_VALIDATE_CERTS: "false"
+          ANSIBLE_VERBOSITY: 2
+
+      - name: Clean up vcsim
+        if: always()
+        run: |
+          docker stop vcsim || true
+          docker rm vcsim || true
+
+  # Job 3: Syntax check for playbooks
+  playbook-syntax:
+    name: Playbook Syntax Check
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install -r collections/requirements.yml
+
+      - name: Create dummy vault file
+        run: |
+          mkdir -p group_vars/all
+          echo "vault_esxi_password: dummy" > group_vars/all/vault.yml
+          echo "vault_vcenter_password: dummy" >> group_vars/all/vault.yml
+          echo "vault_parent_vcenter_password: dummy" >> group_vars/all/vault.yml
+
+      - name: Create dummy parent vCenter config
+        run: |
+          cat > group_vars/all/connection.yml << EOF
+          vsphere_parent_vcenter:
+            hostname: vcenter.example.com
+            username: administrator@vsphere.local
+            password: "{{ vault_parent_vcenter_password }}"
+            datacenter: dc1
+            cluster: cluster1
+            esxi_host: esxi.example.com
+            datastore: datastore1
+            validate_certs: false
+          EOF
+
+      - name: Syntax check deploy playbook
+        run: |
+          ansible-playbook playbooks/deploy_nested_vsphere.yml \
+            --syntax-check \
+            -e topology_file=examples/vsphere_topology_single_fd.yml
+
+      - name: Syntax check destroy playbook
+        run: |
+          ansible-playbook playbooks/destroy_nested_vsphere.yml --syntax-check
+
+      - name: Syntax check preflight playbook
+        run: |
+          ansible-playbook playbooks/preflight.yml \
+            --syntax-check \
+            -e topology_file=examples/vsphere_topology_single_fd.yml
+
+  # Job 4: Integration tests (optional - requires real vSphere or vcsim)
+  integration:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [molecule, playbook-syntax]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install -r collections/requirements.yml
+
+      - name: Start vCenter Simulator (vcsim)
+        run: |
+          docker run -d --name vcsim \
+            -p 8989:8989 \
+            -e VCSIM_STANDALONE_PORT=8989 \
+            nimmis/vcsim:latest
+          sleep 15
+
+      - name: Create integration test topology
+        run: |
+          cat > vsphere_topology_ci.yml << EOF
+          deployment_name: ci-test
+          region: test-region
+          esxi_hosts:
+            - name: esxi01
+              ip: 192.168.1.10
+              mask: 255.255.255.0
+              gw: 192.168.1.1
+              cpu: 4
+              memory_mb: 8192
+              disk_gb: 50
+              username: root
+              password: VMware1!
+              datacenter: dc1
+              cluster: cluster1
+          vcenter_vms:
+            - name: vcsa01
+              hostname: vcsa01.test.local
+              ip: 192.168.1.5
+              mask: 255.255.255.0
+              gw: 192.168.1.1
+              cpu: 4
+              memory_mb: 8192
+              datacenters:
+                - name: dc1
+                  clusters:
+                    - name: cluster1
+          failure_domains:
+            - name: zone-a
+              region: test-region
+              zone: zone-a
+              zone_type: ComputeCluster
+              datacenter: dc1
+              cluster: cluster1
+          EOF
+
+      - name: Run integration test (dry-run mode)
+        run: |
+          # This is a dry-run/check mode test
+          # In a real scenario, you'd deploy to vcsim
+          ansible-playbook playbooks/preflight.yml \
+            -e topology_file=vsphere_topology_ci.yml \
+            -e vsphere_parent_vcenter='{"hostname":"localhost","port":"8989","username":"user","password":"pass","validate_certs":false}' \
+            --check
+        continue-on-error: true
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker stop vcsim || true
+          docker rm vcsim || true
+
+  # Job 5: Security scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  # Job 6: Documentation validation
+  docs:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check required documentation files
+        run: |
+          required_docs=(
+            "README.md"
+            "docs/DEVELOPMENT.md"
+            "docs/VARIABLES.md"
+          )
+          missing_docs=()
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              missing_docs+=("$doc")
+            fi
+          done
+          if [ ${#missing_docs[@]} -gt 0 ]; then
+            echo "Missing documentation files:"
+            printf '%s\n' "${missing_docs[@]}"
+            exit 1
+          fi
+          echo "All required documentation files present"
+
+      - name: Check for broken links in markdown (optional)
+        run: |
+          npm install -g markdown-link-check || true
+          find . -name "*.md" -exec markdown-link-check {} \; || true
+        continue-on-error: true
+
+  # Summary job - all tests must pass
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint, molecule, playbook-syntax, security, docs]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "Lint failed"
+            exit 1
+          fi
+          if [ "${{ needs.molecule.result }}" != "success" ]; then
+            echo "Molecule tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.playbook-syntax.result }}" != "success" ]; then
+            echo "Playbook syntax check failed"
+            exit 1
+          fi
+          if [ "${{ needs.security.result }}" != "success" ]; then
+            echo "Security scan had issues (non-fatal)"
+          fi
+          if [ "${{ needs.docs.result }}" != "success" ]; then
+            echo "Documentation validation failed"
+            exit 1
+          fi
+          echo "All tests passed!"

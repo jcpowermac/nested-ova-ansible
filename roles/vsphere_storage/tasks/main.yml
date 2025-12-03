@@ -1,0 +1,34 @@
+---
+# Main tasks for vsphere_storage role
+
+- name: Log storage configuration start
+  ansible.builtin.debug:
+    msg: "{{ 'Starting storage configuration' | deployment_log('INFO', {'hosts': vsphere_storage_esxi_hosts | length}) }}"
+  when: vsphere_storage_debug
+
+- name: Create VMFS datastores
+  ansible.builtin.include_tasks:
+    file: create_vmfs_datastore.yml
+  loop: "{{ vsphere_storage_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"
+  when:
+    - vsphere_storage_vmfs_enabled
+    - vsphere_storage_esxi_hosts | length > 0
+
+- name: Mount NFS datastores
+  ansible.builtin.include_tasks:
+    file: mount_nfs_datastore.yml
+  loop: "{{ vsphere_storage_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"
+  when:
+    - vsphere_storage_nfs_shares | length > 0
+    - vsphere_storage_esxi_hosts | length > 0
+
+- name: Log storage configuration complete
+  ansible.builtin.debug:
+    msg: "{{ 'Storage configuration completed' | deployment_log('INFO', {'vmfs_hosts': vsphere_storage_esxi_hosts | length, 'nfs_shares': vsphere_storage_nfs_shares | length}) }}"
+  when: vsphere_storage_debug

@@ -1,0 +1,24 @@
+---
+# Attach zone tags to appropriate objects
+
+- name: "Zone {{ fd.zone }} - Determine object to tag"
+  ansible.builtin.set_fact:
+    _zone_object_type: "{{ fd.zone_type | default('ComputeCluster') }}"
+    _zone_object_name: "{{ fd.cluster }}"
+
+- name: "Zone {{ fd.zone }} - Attach tag to {{ _zone_object_type }}"
+  community.vmware.vmware_tag_manager:
+    hostname: "{{ vsphere_tagging_vcenter.hostname }}"
+    username: "{{ vsphere_tagging_vcenter.username }}"
+    password: "{{ vsphere_tagging_vcenter.password }}"
+    validate_certs: "{{ vsphere_tagging_vcenter.validate_certs }}"
+    object_name: "{{ _zone_object_name }}"
+    object_type: "{{ vsphere_tagging_type_map[_zone_object_type] }}"
+    tag_names:
+      - "{{ fd.zone }}"
+    state: present
+  retries: "{{ vsphere_tagging_retry_count }}"
+  delay: "{{ vsphere_tagging_retry_delay }}"
+  register: _zone_tag_result
+  until: _zone_tag_result is succeeded
+  when: _zone_object_type != 'HostGroup'  # HostGroup handled separately by vsphere_host_groups role

@@ -1,0 +1,100 @@
+---
+# vsphere_vm_deploy role defaults
+
+# Parent vCenter connection details
+# These are typically inherited from group_vars/all/connection.yml
+# but can be overridden here if needed
+vsphere_vm_deploy_parent_vcenter:
+  hostname: "{{ parent_vcenter_hostname }}"
+  username: "{{ parent_vcenter_username }}"
+  password: "{{ parent_vcenter_password }}"
+  datacenter: "{{ parent_vcenter_datacenter }}"
+  datastore: "{{ parent_vcenter_datastore }}"
+  cluster: "{{ parent_vcenter_cluster }}"
+  folder: "{{ parent_vcenter_folder }}"
+  network: "{{ parent_vcenter_network }}"
+  validate_certs: "{{ parent_vcenter_validate_certs | default(false) }}"
+
+# ESXi VMs to deploy
+# Structure:
+# vsphere_vm_deploy_esxi_hosts:
+#   - name: "esxi-1"
+#     memory_mb: 8192
+#     cpu: 4
+#     disk_gb: 100
+#     networks:
+#       - name: "VM Network"
+#         connected: true
+vsphere_vm_deploy_esxi_hosts: []
+
+# vCenter VMs to deploy
+# Structure:
+# vsphere_vm_deploy_vcenter_vms:
+#   - name: "vcenter-1"
+#     deployment_size: "tiny"  # tiny, small, medium, large
+#     memory_mb: 12288  # Optional override
+#     cpu: 2  # Optional override
+#     network: "VM Network"
+vsphere_vm_deploy_vcenter_vms: []
+
+# VM hardware defaults
+vsphere_vm_deploy_vm_version: "{{ default_vm_hardware_version | default(21) }}"
+
+# ESXi defaults
+vsphere_vm_deploy_esxi_cpu: "{{ default_esxi_cpu | default(4) }}"
+vsphere_vm_deploy_esxi_memory_mb: "{{ default_esxi_memory_mb | default(8192) }}"
+vsphere_vm_deploy_esxi_disk_gb: "{{ default_esxi_disk_gb | default(100) }}"
+vsphere_vm_deploy_esxi_template_prefix: "{{ deployment_version | default('VC8.0.2.00100-22617221-ESXi8.0u2c') }}"
+
+# vCenter defaults
+vsphere_vm_deploy_vcenter_cpu: "{{ default_vcenter_cpu | default(2) }}"
+vsphere_vm_deploy_vcenter_memory_mb: "{{ default_vcenter_memory_mb | default(12288) }}"
+vsphere_vm_deploy_vcenter_deployment_size: "tiny"  # tiny, small, medium, large, infrastructure
+
+# Nested credentials
+vsphere_vm_deploy_nested_password: "{{ nested_esxi_password }}"
+vsphere_vm_deploy_nested_vcenter_domain: "{{ nested_vsphere_domain | default('vsphere.local') }}"
+
+# Content library settings for vCenter OVA deployment
+vsphere_vm_deploy_content_library: "nested"
+vsphere_vm_deploy_vcenter_ova_name: "{{ deployment_version | default('VC8.0.2.00100-22617221-ESXi8.0u2c') }}"
+
+# Network configuration
+vsphere_vm_deploy_network_adapter_type: "vmxnet3"
+vsphere_vm_deploy_esxi_network_adapters: 2  # Number of NICs for ESXi hosts
+
+# Wait and timeout settings
+vsphere_vm_deploy_wait_timeout: "{{ global_wait_timeout | default(900) }}"  # 15 minutes
+vsphere_vm_deploy_wait_for_ip_timeout: 600  # 10 minutes
+vsphere_vm_deploy_wait_for_guest_tools_retries: 120
+vsphere_vm_deploy_wait_for_guest_tools_delay: 5
+vsphere_vm_deploy_wait_for_ip_retries: 10
+vsphere_vm_deploy_wait_for_ip_delay: 30
+vsphere_vm_deploy_wait_for_service_timeout: 900  # 15 minutes for ESXi/vCenter API
+vsphere_vm_deploy_wait_for_service_sleep: 10
+
+# Idempotency settings
+vsphere_vm_deploy_force_recreate: false  # Set to true to force VM recreation (anti-pattern, use with caution)
+vsphere_vm_deploy_check_before_create: true  # Always check if VM exists before creating
+
+# Disk configuration
+vsphere_vm_deploy_disk_controller_type: "paravirtual"
+vsphere_vm_deploy_disk_type: "thin"
+vsphere_vm_deploy_disk_unit_number: 2
+vsphere_vm_deploy_disk_controller_number: 0
+
+# Resource shares (high priority for nested VMs)
+vsphere_vm_deploy_cpu_shares_level: "high"
+vsphere_vm_deploy_mem_shares_level: "high"
+
+# Guest OS type detection
+vsphere_vm_deploy_guest_id_v7: "vmkernel7Guest"
+vsphere_vm_deploy_guest_id_v8: "vmkernel8Guest"
+
+# Logging and debug
+vsphere_vm_deploy_debug: "{{ enable_debug_mode | default(false) }}"
+vsphere_vm_deploy_logging_enabled: true
+
+# Certificate retrieval
+vsphere_vm_deploy_retrieve_certificates: true
+vsphere_vm_deploy_certificate_download_path: "{{ shared_dir | default('/tmp') }}"

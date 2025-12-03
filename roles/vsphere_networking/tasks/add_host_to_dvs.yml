@@ -1,0 +1,13 @@
+---
+# Add ESXi host to distributed vSwitch
+
+- name: "Host {{ esxi_host.hostname }} - Add to dvSwitch {{ esxi_host.switch_name }}"
+  community.vmware.vmware_dvs_host:
+    hostname: "{{ vsphere_networking_vcenter.hostname }}"
+    username: "{{ vsphere_networking_vcenter.username }}"
+    password: "{{ vsphere_networking_vcenter.password }}"
+    validate_certs: "{{ vsphere_networking_vcenter.validate_certs }}"
+    esxi_hostname: "{{ esxi_host.hostname }}"
+    switch_name: "{{ esxi_host.switch_name }}"
+    vmnics: "{{ esxi_host.vmnics | default(vsphere_networking_host_nics) }}"
+    state: present

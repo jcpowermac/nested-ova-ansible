@@ -1,0 +1,19 @@
+---
+# Configure auto-start settings for ESXi hosts
+
+- name: Configure auto-start settings for each host
+  community.vmware.vmware_host_auto_start:
+    hostname: "{{ vsphere_host_config_vcenter.hostname }}"
+    username: "{{ vsphere_host_config_vcenter.username }}"
+    password: "{{ vsphere_host_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_host_config_vcenter.validate_certs }}"
+    esxi_hostname: "{{ esxi_host.hostname }}"
+    system_defaults:
+      enabled: "{{ vsphere_host_config_enable_auto_start }}"
+      start_delay: "{{ vsphere_host_config_auto_start_delay }}"
+      stop_action: "{{ vsphere_host_config_auto_stop_action }}"
+      wait_for_heartbeat: "{{ vsphere_host_config_auto_wait_for_heartbeat }}"
+  loop: "{{ vsphere_host_config_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"

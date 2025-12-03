@@ -1,0 +1,28 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 200
+    level: warning
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no']
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1
+  comments-indentation: disable
+
+ignore: |
+  .github/
+  .ansible/
+  .venv/
+  venv/
+  v1_backup_*/
+  state/
+  molecule/

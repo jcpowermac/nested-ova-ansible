@@ -1,0 +1,42 @@
+---
+# Create VMFS datastore on ESXi host
+
+- name: "Host {{ esxi_host.hostname }} - Get disk information"
+  community.vmware.vmware_host_disk_info:
+    hostname: "{{ esxi_host.hostname }}"
+    username: "{{ vsphere_storage_esxi_credentials.username }}"
+    password: "{{ vsphere_storage_esxi_credentials.password }}"
+    validate_certs: false
+    esxi_hostname: "{{ esxi_host.hostname }}"
+  register: _host_disk_info
+
+- name: "Host {{ esxi_host.hostname }} - Find target disk by CTD"
+  ansible.builtin.set_fact:
+    _vmfs_disk_name: "{{ item.canonical_name }}"
+  loop: "{{ _host_disk_info.hosts_disk_info[esxi_host.hostname] | default([]) }}"
+  loop_control:
+    label: "{{ item.canonical_name }}"
+  when:
+    - item.device_ctd_list is defined
+    - item.device_ctd_list | length > 0
+    - item.device_ctd_list[0] == vsphere_storage_vmfs_target_disk_ctd
+
+- name: "Host {{ esxi_host.hostname }} - Create VMFS datastore"
+  community.vmware.vmware_host_datastore:
+    hostname: "{{ esxi_host.hostname }}"
+    username: "{{ vsphere_storage_esxi_credentials.username }}"
+    password: "{{ vsphere_storage_esxi_credentials.password }}"
+    validate_certs: false
+    datastore_name: "{{ vsphere_storage_vmfs_datastore_prefix }}-{{ esxi_host.hostname }}"
+    vmfs_device_name: "{{ _vmfs_disk_name }}"
+    vmfs_version: "{{ vsphere_storage_vmfs_version }}"
+    datastore_type: vmfs
+    state: present
+  when: _vmfs_disk_name is defined
+
+- name: "Host {{ esxi_host.hostname }} - Log datastore creation"
+  ansible.builtin.debug:
+    msg: "VMFS datastore created on {{ esxi_host.hostname }}: {{ vsphere_storage_vmfs_datastore_prefix }}-{{ esxi_host.hostname }}"
+  when:
+    - vsphere_storage_debug
+    - _vmfs_disk_name is defined

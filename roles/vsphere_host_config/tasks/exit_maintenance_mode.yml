@@ -1,0 +1,21 @@
+---
+# Exit maintenance mode for all ESXi hosts
+
+- name: Exit maintenance mode for each host
+  community.vmware.vmware_maintenancemode:
+    hostname: "{{ vsphere_host_config_vcenter.hostname }}"
+    username: "{{ vsphere_host_config_vcenter.username }}"
+    password: "{{ vsphere_host_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_host_config_vcenter.validate_certs }}"
+    esxi_hostname: "{{ esxi_host.hostname }}"
+    timeout: "{{ vsphere_host_config_maintenance_timeout }}"
+    state: absent
+  loop: "{{ vsphere_host_config_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+    label: "{{ esxi_host.hostname }}"
+
+- name: Log maintenance mode exit
+  ansible.builtin.debug:
+    msg: "All ESXi hosts exited maintenance mode"
+  when: vsphere_host_config_debug

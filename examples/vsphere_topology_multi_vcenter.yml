@@ -1,0 +1,313 @@
+---
+# Example: Multiple vCenter Topology
+#
+# This topology demonstrates multiple independent vCenters.
+# Suitable for:
+#   - Multi-region deployments
+#   - vCenter HA testing
+#   - Isolated environments
+#   - Testing vCenter federation
+#
+# Resources:
+#   - 6 ESXi hosts (3 per vCenter)
+#   - 2 vCenters (one per region)
+#   - 2 Datacenters (one per vCenter)
+#   - 2 Failure Domains (one per vCenter)
+
+deployment_name: multi-vcenter-lab
+region: multi-region
+
+# ESXi Host Configuration
+esxi_hosts:
+  # Region 1 (East) hosts
+  - name: esxi-east-01
+    ip: 192.168.1.10
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 10
+    memory_mb: 81920  # 80 GB
+    disk_gb: 250
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc-east
+    cluster: cluster-east
+    folder: /nested-lab/east
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-east-02
+    ip: 192.168.1.11
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 10
+    memory_mb: 81920
+    disk_gb: 250
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc-east
+    cluster: cluster-east
+    folder: /nested-lab/east
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-east-03
+    ip: 192.168.1.12
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    vlan: 0
+    cpu: 10
+    memory_mb: 81920
+    disk_gb: 250
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc-east
+    cluster: cluster-east
+    folder: /nested-lab/east
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  # Region 2 (West) hosts
+  - name: esxi-west-01
+    ip: 192.168.2.10
+    mask: 255.255.255.0
+    gw: 192.168.2.1
+    vlan: 0
+    cpu: 10
+    memory_mb: 81920
+    disk_gb: 250
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc-west
+    cluster: cluster-west
+    folder: /nested-lab/west
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-west-02
+    ip: 192.168.2.11
+    mask: 255.255.255.0
+    gw: 192.168.2.1
+    vlan: 0
+    cpu: 10
+    memory_mb: 81920
+    disk_gb: 250
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc-west
+    cluster: cluster-west
+    folder: /nested-lab/west
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-west-03
+    ip: 192.168.2.12
+    mask: 255.255.255.0
+    gw: 192.168.2.1
+    vlan: 0
+    cpu: 10
+    memory_mb: 81920
+    disk_gb: 250
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc-west
+    cluster: cluster-west
+    folder: /nested-lab/west
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+# vCenter Configuration (2 independent vCenters)
+vcenter_vms:
+  # vCenter for East region
+  - name: vcsa-east
+    hostname: vcsa-east.lab.local
+    ip: 192.168.1.5
+    mask: 255.255.255.0
+    gw: 192.168.1.1
+    dns: 192.168.1.1
+    domain: lab.local
+    ntp: pool.ntp.org
+    cpu: 10
+    memory_mb: 28672  # 28 GB
+    disk_gb: 300
+    username: administrator@vsphere.local
+    password: "{{ vault_vcenter_password }}"
+    sso_domain: vsphere.local
+    datacenter: dc-east
+    folder: /nested-lab/east
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+    datacenters:
+      - name: dc-east
+        clusters:
+          - name: cluster-east
+            drs_enabled: true
+            drs_vmotion_rate: 3
+            ha_enabled: true
+            ha_admission_control: true
+
+    dvswitches:
+      - name: dvSwitch-east
+        datacenter: dc-east
+        version: 7.0.0
+        mtu: 1500
+        uplinks: 2
+        discovery_protocol: lldp
+        discovery_operation: listen
+        port_groups:
+          - name: VM Network
+            vlan: 0
+            num_ports: 128
+          - name: Storage Network
+            vlan: 100
+            num_ports: 64
+
+    esxi_hosts:
+      - hostname: 192.168.1.10
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc-east
+        cluster: cluster-east
+      - hostname: 192.168.1.11
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc-east
+        cluster: cluster-east
+      - hostname: 192.168.1.12
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc-east
+        cluster: cluster-east
+
+  # vCenter for West region
+  - name: vcsa-west
+    hostname: vcsa-west.lab.local
+    ip: 192.168.2.5
+    mask: 255.255.255.0
+    gw: 192.168.2.1
+    dns: 192.168.2.1
+    domain: lab.local
+    ntp: pool.ntp.org
+    cpu: 10
+    memory_mb: 28672
+    disk_gb: 300
+    username: administrator@vsphere.local
+    password: "{{ vault_vcenter_password }}"
+    sso_domain: vsphere.local
+    datacenter: dc-west
+    folder: /nested-lab/west
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+    datacenters:
+      - name: dc-west
+        clusters:
+          - name: cluster-west
+            drs_enabled: true
+            drs_vmotion_rate: 3
+            ha_enabled: true
+            ha_admission_control: true
+
+    dvswitches:
+      - name: dvSwitch-west
+        datacenter: dc-west
+        version: 7.0.0
+        mtu: 1500
+        uplinks: 2
+        discovery_protocol: lldp
+        discovery_operation: listen
+        port_groups:
+          - name: VM Network
+            vlan: 0
+            num_ports: 128
+          - name: Storage Network
+            vlan: 100
+            num_ports: 64
+
+    esxi_hosts:
+      - hostname: 192.168.2.10
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc-west
+        cluster: cluster-west
+      - hostname: 192.168.2.11
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc-west
+        cluster: cluster-west
+      - hostname: 192.168.2.12
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc-west
+        cluster: cluster-west
+
+content_library:
+  name: nested-vsphere-templates
+  description: OVA templates for nested vSphere deployment
+  datastore: "{{ vsphere_parent_vcenter.datastore }}"
+  esxi_template_item: Nested_ESXi8.0u2c_Appliance_Template_v1
+  vcenter_template_item: VMware-vCenter-Server-Appliance-8.0.2.00100
+
+# Failure Domains (one per vCenter/region)
+failure_domains:
+  - name: us-east-1
+    region: us-east-1
+    zone: us-east-1a
+    zone_type: ComputeCluster
+    datacenter: dc-east
+    cluster: cluster-east
+    vcenter:
+      hostname: vcsa-east.lab.local
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    nfs_datastores:
+      - datastore_name: nfs-storage-east
+        nfs_server: 192.168.1.100
+        nfs_path: /export/east
+        nfs_version: 3
+        esxi_hostname: 192.168.1.10
+
+  - name: us-west-1
+    region: us-west-1
+    zone: us-west-1a
+    zone_type: ComputeCluster
+    datacenter: dc-west
+    cluster: cluster-west
+    vcenter:
+      hostname: vcsa-west.lab.local
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    nfs_datastores:
+      - datastore_name: nfs-storage-west
+        nfs_server: 192.168.2.100
+        nfs_path: /export/west
+        nfs_version: 3
+        esxi_hostname: 192.168.2.10
+
+# Use Cases:
+# 1. Multi-region OpenShift deployments (separate clusters per vCenter)
+# 2. vCenter HA / disaster recovery testing
+# 3. Isolated environments with different configurations
+# 4. Testing vCenter federation or Enhanced Linked Mode
+
+wait_for_ip: true
+vm_wait_timeout: 1200  # 20 minutes (multiple vCenters)
+vsphere_debug_mode: false

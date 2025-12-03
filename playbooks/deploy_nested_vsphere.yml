@@ -1,0 +1,169 @@
+---
+# Main deployment playbook for nested vSphere environment
+# This orchestrates all roles in the correct order to build a complete nested vSphere infrastructure
+
+- name: Deploy Nested vSphere Environment
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # Load topology file (can be overridden via -e topology_file=path/to/file.yml)
+    topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
+
+  pre_tasks:
+    - name: Validate topology file exists
+      ansible.builtin.stat:
+        path: "{{ topology_file }}"
+      register: _topology_file_stat
+      failed_when: not _topology_file_stat.stat.exists
+
+    - name: Load topology configuration
+      ansible.builtin.include_vars:
+        file: "{{ topology_file }}"
+        name: _topology
+
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "Deployment Name: {{ _topology.deployment_name | default('nested-vsphere') }}"
+          - "Parent vCenter: {{ vsphere_parent_vcenter.hostname | default('from environment') }}"
+          - "Number of ESXi Hosts: {{ _topology.esxi_hosts | default([]) | length }}"
+          - "Number of vCenters: {{ _topology.vcenter_vms | default([]) | length }}"
+          - "Number of Failure Domains: {{ _topology.failure_domains | default([]) | length }}"
+
+    - name: Confirm deployment
+      ansible.builtin.pause:
+        prompt: "Press Enter to continue with deployment, or Ctrl+C to abort"
+      when: vsphere_interactive_mode | default(false) | bool
+
+  tasks:
+    # Phase 1: Deploy Virtual Machines (ESXi hosts and vCenter appliances)
+    - name: "Phase 1: Deploy ESXi and vCenter VMs"
+      ansible.builtin.import_role:
+        name: vsphere_vm_deploy
+      vars:
+        vsphere_vm_deploy_parent_vcenter: "{{ vsphere_parent_vcenter }}"
+        vsphere_vm_deploy_esxi_hosts: "{{ _topology.esxi_hosts | default([]) }}"
+        vsphere_vm_deploy_vcenter_vms: "{{ _topology.vcenter_vms | default([]) }}"
+        vsphere_vm_deploy_content_library: "{{ _topology.content_library | default({}) }}"
+        vsphere_vm_deploy_wait_for_ip: "{{ _topology.wait_for_ip | default(true) }}"
+        vsphere_vm_deploy_wait_timeout: "{{ _topology.vm_wait_timeout | default(900) }}"
+
+    # Phase 2: Configure Datacenter and Cluster Infrastructure
+    - name: "Phase 2: Configure Datacenters and Clusters"
+      ansible.builtin.import_role:
+        name: vsphere_datacenter_config
+      vars:
+        vsphere_datacenter_config_vcenter: "{{ item }}"
+        vsphere_datacenter_config_datacenters: "{{ item.datacenters | default([]) }}"
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.hostname }}"
+      when: _topology.vcenter_vms | default([]) | length > 0
+
+    # Phase 3: Add ESXi Hosts to vCenter
+    - name: "Phase 3: Add ESXi Hosts to Clusters"
+      ansible.builtin.import_role:
+        name: vsphere_host_config
+      vars:
+        vsphere_host_config_vcenter: "{{ item }}"
+        vsphere_host_config_esxi_hosts: "{{ item.esxi_hosts | default([]) }}"
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.hostname }}"
+      when: _topology.vcenter_vms | default([]) | length > 0
+
+    # Phase 4: Configure Networking (Distributed vSwitch)
+    - name: "Phase 4: Configure Distributed vSwitch"
+      ansible.builtin.import_role:
+        name: vsphere_networking
+      vars:
+        vsphere_networking_vcenter: "{{ item }}"
+        vsphere_networking_dvswitches: "{{ item.dvswitches | default([]) }}"
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.hostname }}"
+      when:
+        - _topology.vcenter_vms | default([]) | length > 0
+        - item.dvswitches | default([]) | length > 0
+
+    # Phase 5: Configure Storage (VMFS and NFS)
+    - name: "Phase 5: Configure Datastores"
+      ansible.builtin.import_role:
+        name: vsphere_storage
+      vars:
+        vsphere_storage_vcenter: "{{ item.vcenter }}"
+        vsphere_storage_vmfs_datastores: "{{ item.vmfs_datastores | default([]) }}"
+        vsphere_storage_nfs_datastores: "{{ item.nfs_datastores | default([]) }}"
+      loop: "{{ _topology.failure_domains | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.name }}"
+      when:
+        - (item.vmfs_datastores | default([]) | length > 0) or (item.nfs_datastores | default([]) | length > 0)
+
+    # Phase 6: Configure OpenShift Topology Tags
+    - name: "Phase 6: Create OpenShift Region/Zone Tags"
+      ansible.builtin.import_role:
+        name: vsphere_tagging
+      vars:
+        vsphere_tagging_vcenter: "{{ item }}"
+        vsphere_tagging_failure_domains: "{{ _topology.failure_domains | default([]) }}"
+        vsphere_tagging_region: "{{ _topology.region | default('region-1') }}"
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.hostname }}"
+      when:
+        - _topology.vcenter_vms | default([]) | length > 0
+        - _topology.failure_domains | default([]) | length > 0
+
+    # Phase 7: Configure DRS Host Groups (for HostGroup zone_type)
+    - name: "Phase 7: Create DRS Host Groups"
+      ansible.builtin.import_role:
+        name: vsphere_host_groups
+      vars:
+        vsphere_host_groups_vcenter: "{{ item }}"
+        vsphere_host_groups_failure_domains: "{{ _topology.failure_domains | default([]) }}"
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.hostname }}"
+      when:
+        - _topology.vcenter_vms | default([]) | length > 0
+        - _topology.failure_domains | default([]) | selectattr('zone_type', 'defined') | selectattr('zone_type', 'equalto', 'HostGroup') | list | length > 0
+
+  post_tasks:
+    - name: Deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Nested vSphere Deployment Complete"
+          - "=========================================="
+          - "Deployment Name: {{ _topology.deployment_name | default('nested-vsphere') }}"
+          - "ESXi Hosts Deployed: {{ _topology.esxi_hosts | default([]) | length }}"
+          - "vCenters Deployed: {{ _topology.vcenter_vms | default([]) | length }}"
+          - "Failure Domains Configured: {{ _topology.failure_domains | default([]) | length }}"
+          - "=========================================="
+          - "Next Steps:"
+          - "  1. Access vCenter at: https://{{ _topology.vcenter_vms[0].hostname }}"
+          - "  2. Verify tags in vCenter UI"
+          - "  3. Deploy OpenShift using the configured topology"
+          - "=========================================="
+      when: _topology.vcenter_vms | default([]) | length > 0
+
+    - name: Save deployment state
+      ansible.builtin.copy:
+        content: |
+          ---
+          deployment_name: {{ _topology.deployment_name | default('nested-vsphere') }}
+          deployment_date: {{ ansible_date_time.iso8601 }}
+          topology_file: {{ topology_file }}
+          esxi_hosts: {{ _topology.esxi_hosts | default([]) | to_nice_yaml(indent=2) | indent(2) }}
+          vcenter_vms: {{ _topology.vcenter_vms | default([]) | to_nice_yaml(indent=2) | indent(2) }}
+          failure_domains: {{ _topology.failure_domains | default([]) | to_nice_yaml(indent=2) | indent(2) }}
+        dest: "{{ playbook_dir }}/../state/{{ _topology.deployment_name | default('nested-vsphere') }}_deployment.yml"
+        mode: '0644'
+      when: vsphere_save_state | default(true) | bool

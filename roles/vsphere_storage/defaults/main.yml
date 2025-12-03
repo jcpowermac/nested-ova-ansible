@@ -1,0 +1,37 @@
+---
+# vsphere_storage role defaults
+
+# vCenter connection (for getting host info)
+vsphere_storage_vcenter:
+  hostname: ""
+  username: "administrator@vsphere.local"
+  password: ""
+  validate_certs: false
+
+# ESXi hosts for storage configuration
+vsphere_storage_esxi_hosts: []
+
+# VMFS datastore configuration
+vsphere_storage_vmfs_enabled: true
+vsphere_storage_vmfs_version: 6
+vsphere_storage_vmfs_target_disk_ctd: "vmhba0:C0:T2:L0"  # Default disk identifier
+vsphere_storage_vmfs_datastore_prefix: "Datastore"
+
+# NFS datastore configuration
+# Structure:
+# vsphere_storage_nfs_shares:
+#   - name: "shared-nfs"
+#     server: "nfs.example.com"
+#     path: "/exports/data"
+#     type: "nfs41"  # nfs, nfs41
+#     read_only: false
+#     failure_domains: []  # Empty = all hosts
+vsphere_storage_nfs_shares: []
+
+# ESXi credentials for direct connection
+vsphere_storage_esxi_credentials:
+  username: "root"
+  password: ""
+
+# Debug logging
+vsphere_storage_debug: "{{ enable_debug_mode | default(false) }}"

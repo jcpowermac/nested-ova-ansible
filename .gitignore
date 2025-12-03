@@ -1,0 +1,96 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Ansible
+*.retry
+.ansible/
+.ansible_cache/
+.ansible-retry/
+ansible.log
+
+# Vault password file
+.vault_pass
+.vault_password
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+*.cover
+
+# Molecule
+.molecule/
+.cache/
+
+# Deployment state
+state/*.yml
+!state/.gitkeep
+
+# Local topology files (keep examples)
+my_*.yml
+local_*.yml
+test_topology.yml
+
+# Override files
+/tmp/override-vars.yaml
+override-*.yml
+
+# Docker
+.docker/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.envrc
+
+# Created directories during testing
+sim_shared_dir/
+
+# Temporary Ansible files
+.ansible/
+
+# govc script
+govc.sh
+
+# NFS test file
+nfs.yml
+
+# Test Python scripts
+test.py
+
+# Migration and backup files
+v1_backup_*/
+MIGRATION_SUMMARY.txt
+*.yml.bak
+*.yml.new
+
+# Platform file (user-specific)
+platform.yaml
+vsphere_topology.yml
+!examples/vsphere_topology_*.yml

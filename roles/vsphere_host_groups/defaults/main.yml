@@ -1,0 +1,28 @@
+---
+# vsphere_host_groups role defaults
+
+# vCenter connection
+vsphere_host_groups_vcenter:
+  hostname: ""
+  username: "administrator@vsphere.local"
+  password: ""
+  validate_certs: false
+
+# Host groups enabled
+vsphere_host_groups_enabled: true
+
+# Failure domains for host group creation
+# Only failure domains with zone_type: "HostGroup" will create DRS host groups
+# Structure:
+# vsphere_host_groups_failure_domains:
+#   - name: "zone-a"
+#     zone_type: "HostGroup"
+#     datacenter: "dc1"
+#     cluster: "cluster1"
+#     hosts:
+#       - "192.168.1.10"
+#       - "192.168.1.11"
+vsphere_host_groups_failure_domains: []
+
+# Debug logging
+vsphere_host_groups_debug: "{{ enable_debug_mode | default(false) }}"

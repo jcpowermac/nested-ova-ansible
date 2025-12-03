@@ -1,0 +1,97 @@
+---
+# Global vSphere Configuration Defaults
+# These can be overridden via topology file or extra vars
+
+# Deployment configuration
+deployment_name: "{{ lookup('ansible.builtin.env', 'CLUSTER_NAME') | default('nested-vsphere') }}"
+shared_dir: "{{ lookup('ansible.builtin.env', 'SHARED_DIR') | default('/tmp') }}"
+
+# Resource allocation
+hosts_per_failure_domain: "{{ lookup('ansible.builtin.env', 'HOSTS_PER_FAILURE_DOMAIN') | default(1) | int }}"
+allocated_memory_mb: "{{ lookup('ansible.builtin.env', 'MEMORY') | default(98304) | int }}"
+allocated_vcpus: "{{ lookup('ansible.builtin.env', 'VCPUS') | default(24) | int }}"
+allocated_disk_gb: "{{ lookup('ansible.builtin.env', 'DISKGB') | default(1024) | int }}"
+
+# Nested vCenter/ESXi configuration
+nested_vsphere_domain: "vsphere.local"
+nested_ntp_server: "{{ lookup('ansible.builtin.env', 'NTP_SERVER') | default('time.google.com') }}"
+nested_deployment_network: "{{ lookup('ansible.builtin.env', 'GOVC_NETWORK') | default('VM Network') }}"
+
+# vSphere version/assets configuration
+# Define available vSphere versions and their OVA files
+vsphere_assets:
+  - name: "VC7.0.3.01400-21477706-ESXi7.0u3q"
+    esxi_ova: "Nested_ESXi7.0u3q_Appliance_Template_v1.ova"
+    vcenter_ova: "VMware-vCenter-Server-Appliance-7.0.3.01400-21477706_OVF10.ova"
+    http_server: "{{ lookup('ansible.builtin.env', 'OVA_HTTP_SERVER') | default('') }}"
+    default: false
+  - name: "VC8.0.2.00100-22617221-ESXi8.0u2c"
+    esxi_ova: "Nested_ESXi8.0u2c_Appliance_Template_v1.ova"
+    vcenter_ova: "VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova"
+    http_server: "{{ lookup('ansible.builtin.env', 'OVA_HTTP_SERVER') | default('') }}"
+    default: true
+
+# Get the default asset version
+default_vsphere_asset: "{{ vsphere_assets | selectattr('default', 'equalto', true) | first }}"
+deployment_version: "{{ lookup('ansible.builtin.env', 'VERSION') | default(default_vsphere_asset.name) }}"
+
+# NFS datastore configuration (can be overridden in topology file)
+nfs_datastores: []
+# Example structure:
+# nfs_datastores:
+#   - server: "nfs.example.com"
+#     name: "shared-nfs"
+#     path: "/exports/data"
+#     type: "nfs41"
+#     read_only: false
+#     failure_domains: []  # Empty = all hosts, otherwise specific FDs
+
+# Feature flags
+skip_failure_domain_tagging: "{{ lookup('ansible.builtin.env', 'SKIP_FAILURE_DOMAIN_TAGGING') | default('false') | bool }}"
+enable_debug_mode: "{{ lookup('ansible.builtin.env', 'VSPHERE_DEBUG') | default('false') | bool }}"
+
+# Timeouts and retry settings (global defaults, can be overridden per role)
+global_wait_timeout: 900  # 15 minutes
+global_retry_count: 3
+global_retry_delay: 30
+
+# VM hardware defaults
+default_vm_hardware_version: 21  # vSphere 8.0 compatible
+default_esxi_cpu: 4
+default_esxi_memory_mb: 8192
+default_esxi_disk_gb: 100
+default_vcenter_cpu: 2
+default_vcenter_memory_mb: 12288
+
+# Networking defaults
+default_dvswitch_mtu: 9000
+default_dvswitch_version: "8.0.0"
+default_uplink_quantity: 1
+
+# DRS and HA defaults
+default_drs_enabled: true
+default_drs_behavior: "fullyAutomated"
+default_ha_enabled: true
+default_ha_advanced_settings:
+  das.ignoreInsufficientHbDatastore: "True"
+  das.ignoreRedundantNetWarning: "True"
+
+# Tagging defaults
+default_region_tag_category: "openshift-region"
+default_zone_tag_category: "openshift-zone"
+default_region_tag_objects:
+  - Datacenter
+  - Cluster
+default_zone_tag_objects:
+  - Host
+  - Cluster
+
+# Power management
+default_power_policy: "high-performance"
+
+# Storage defaults
+default_vmfs_version: 6
+default_vmfs_disk_ctd: "vmhba0:C0:T2:L0"
+
+# State tracking
+deployment_state_dir: "{{ playbook_dir }}/../state"

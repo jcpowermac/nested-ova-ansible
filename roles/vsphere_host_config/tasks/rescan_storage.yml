@@ -1,0 +1,14 @@
+---
+# Rescan HBAs for storage detection
+
+- name: Rescan HBAs for all clusters
+  community.vmware.vmware_host_scanhba:
+    hostname: "{{ vsphere_host_config_vcenter.hostname }}"
+    username: "{{ vsphere_host_config_vcenter.username }}"
+    password: "{{ vsphere_host_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_host_config_vcenter.validate_certs }}"
+    cluster_name: "{{ item }}"
+    refresh_storage: "{{ vsphere_host_config_refresh_storage }}"
+  loop: "{{ vsphere_host_config_esxi_hosts | map(attribute='cluster') | unique | list }}"
+  loop_control:
+    label: "{{ item }}"

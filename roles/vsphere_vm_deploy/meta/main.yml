@@ -1,0 +1,32 @@
+---
+galaxy_info:
+  role_name: vsphere_vm_deploy
+  author: OpenShift SPLAT Team
+  description: Deploy nested ESXi and vCenter VMs on vSphere
+  company: Red Hat
+  license: Apache-2.0
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Fedora
+      versions:
+        - "38"
+        - "39"
+        - "40"
+
+  galaxy_tags:
+    - vsphere
+    - vmware
+    - nested
+    - virtualization
+    - openshift
+
+dependencies: []
+
+collections:
+  - community.vmware
+  - vmware.vmware

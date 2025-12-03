@@ -1,0 +1,21 @@
+---
+# Mount NFS datastores on ESXi host
+
+- name: "Host {{ esxi_host.hostname }} - Mount NFS shares"
+  community.vmware.vmware_host_datastore:
+    hostname: "{{ esxi_host.hostname }}"
+    username: "{{ vsphere_storage_esxi_credentials.username }}"
+    password: "{{ vsphere_storage_esxi_credentials.password }}"
+    validate_certs: false
+    datastore_name: "{{ nfs_share.name }}"
+    datastore_type: "{{ nfs_share.type | default('nfs41') }}"
+    nfs_server: "{{ nfs_share.server }}"
+    nfs_path: "{{ nfs_share.path }}"
+    nfs_ro: "{{ nfs_share.read_only | default(false) }}"
+    state: present
+  loop: "{{ vsphere_storage_nfs_shares }}"
+  loop_control:
+    loop_var: nfs_share
+    label: "{{ nfs_share.name }}"
+  when:
+    - nfs_share.failure_domains is not defined or nfs_share.failure_domains | length == 0 or esxi_host.failure_domain in nfs_share.failure_domains

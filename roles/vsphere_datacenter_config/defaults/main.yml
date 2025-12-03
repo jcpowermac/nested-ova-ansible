@@ -1,0 +1,48 @@
+---
+# vsphere_datacenter_config role defaults
+
+# vCenter connection details for nested vCenter
+# These should be provided by the calling playbook
+vsphere_datacenter_config_vcenter:
+  hostname: ""
+  username: "administrator@vsphere.local"
+  password: ""
+  validate_certs: false
+
+# Topology configuration
+# Structure:
+# vsphere_datacenter_config_topology:
+#   datacenters:
+#     - name: "dc1"
+#       region: "region1"
+#       clusters:
+#         - name: "cluster1"
+#           zone: "zone1"
+#           resource_pool: "ipi-ci-clusters"
+vsphere_datacenter_config_topology: {}
+
+# DRS configuration
+vsphere_datacenter_config_drs_enabled: true
+vsphere_datacenter_config_drs_behavior: "fullyAutomated"  # manual, partiallyAutomated, fullyAutomated
+vsphere_datacenter_config_drs_vmotion_rate: 3  # 1-5, conservative to aggressive
+
+# HA configuration
+vsphere_datacenter_config_ha_enabled: true
+vsphere_datacenter_config_ha_admission_control_enabled: false
+vsphere_datacenter_config_ha_host_monitoring: "enabled"  # enabled, disabled
+vsphere_datacenter_config_ha_vm_monitoring: "vmMonitoringDisabled"  # vmMonitoringDisabled, vmMonitoringOnly, vmAndAppMonitoring
+vsphere_datacenter_config_ha_advanced_settings:
+  das.ignoreInsufficientHbDatastore: "True"
+  das.ignoreRedundantNetWarning: "True"
+
+# Resource pool configuration
+vsphere_datacenter_config_create_resource_pools: true
+vsphere_datacenter_config_resource_pool_cpu_shares: "normal"
+vsphere_datacenter_config_resource_pool_mem_shares: "normal"
+
+# Retry settings
+vsphere_datacenter_config_retry_count: "{{ global_retry_count | default(3) }}"
+vsphere_datacenter_config_retry_delay: "{{ global_retry_delay | default(30) }}"
+
+# Debug logging
+vsphere_datacenter_config_debug: "{{ enable_debug_mode | default(false) }}"

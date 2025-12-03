@@ -1,0 +1,10 @@
+---
+collections:
+  - name: community.vmware
+    version: ">=3.10.0"
+  - name: vmware.vmware
+    version: ">=1.2.0"
+  - name: community.general
+    version: ">=7.0.0"
+  - name: ansible.posix
+    version: ">=1.5.0"

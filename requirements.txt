@@ -1,0 +1,19 @@
+# Ansible and related tools
+ansible>=2.15.0,<3.0.0
+ansible-lint>=6.17.0
+yamllint>=1.32.0
+molecule>=6.0.0
+molecule-plugins[docker]>=23.5.0
+
+# VMware dependencies
+pyvmomi>=8.0.0
+pyvim>=3.0.0
+
+# General Python dependencies
+requests>=2.31.0
+jmespath>=1.0.1
+dnspython>=2.4.0
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-ansible>=4.1.0

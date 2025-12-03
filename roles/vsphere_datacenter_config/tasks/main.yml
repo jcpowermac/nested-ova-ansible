@@ -1,0 +1,53 @@
+---
+# Main tasks for vsphere_datacenter_config role
+
+- name: Validate vCenter connection parameters
+  ansible.builtin.assert:
+    that:
+      - vsphere_datacenter_config_vcenter.hostname is defined
+      - vsphere_datacenter_config_vcenter.hostname | length > 0
+      - vsphere_datacenter_config_vcenter.password is defined
+    fail_msg: "vCenter connection parameters must be defined"
+    quiet: true
+
+- name: Validate topology configuration
+  ansible.builtin.assert:
+    that:
+      - vsphere_datacenter_config_topology is defined
+      - vsphere_datacenter_config_topology.datacenters is defined
+    fail_msg: "Topology configuration with datacenters must be provided"
+    quiet: true
+
+- name: Log datacenter configuration start
+  ansible.builtin.debug:
+    msg: "{{ 'Starting datacenter configuration' | deployment_log('INFO', {'vcenter': vsphere_datacenter_config_vcenter.hostname}) }}"
+  when: vsphere_datacenter_config_debug
+
+- name: Create datacenters
+  community.vmware.vmware_datacenter:
+    hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
+    username: "{{ vsphere_datacenter_config_vcenter.username }}"
+    password: "{{ vsphere_datacenter_config_vcenter.password }}"
+    validate_certs: "{{ vsphere_datacenter_config_vcenter.validate_certs }}"
+    datacenter_name: "{{ datacenter.name }}"
+    state: present
+  loop: "{{ vsphere_datacenter_config_topology.datacenters }}"
+  loop_control:
+    loop_var: datacenter
+    label: "{{ datacenter.name }}"
+
+- name: Create and configure clusters
+  ansible.builtin.include_tasks:
+    file: configure_cluster.yml
+  loop: "{{ vsphere_datacenter_config_topology.datacenters | subelements('clusters', skip_missing=True) }}"
+  loop_control:
+    loop_var: cluster_item
+    label: "{{ cluster_item.0.name }}/{{ cluster_item.1.name }}"
+  vars:
+    datacenter: "{{ cluster_item.0 }}"
+    cluster: "{{ cluster_item.1 }}"
+
+- name: Log datacenter configuration completion
+  ansible.builtin.debug:
+    msg: "{{ 'Datacenter configuration completed' | deployment_log('INFO', {'datacenters': vsphere_datacenter_config_topology.datacenters | length}) }}"
+  when: vsphere_datacenter_config_debug

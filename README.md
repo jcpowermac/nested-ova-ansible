@@ -1,339 +1,386 @@
-# nested-ova-ansible
+# Nested vSphere Ansible
 
-** https://github.com/openshift-eng/nested-ova-ansible is now the canonical repo **
+**https://github.com/openshift-eng/nested-ova-ansible is now the canonical repo**
 
-Provisions nested vCenter and ESXi hosts.
+Production-ready Ansible automation for deploying nested vSphere environments to support OpenShift testing and development.
 
-## Prerequisites
+## Version 2.0 - Complete Rewrite
 
-- Ansible
-- ESXi and vCenter OVAs hosted on an unauthenticated HTTP(S) server. For example: 
-    ```bash
-    python -m http.server
-    ```
-  or https://github.com/svenstaro/miniserve
-- DHCP server on the hosting environment port group
-- Set up your physical host to have your vSwitch or your DVS set to:
-    - [x] Promiscuous mode accept
-    - [x] MAC address changes accept
-    - [x] Forged transmits accept
-  Note: If using DVS 6.6+ set `MAC learning` Status to `ENABLED` (leave the defaults). Additionally, set `Forge Transmits` to `Accept`, `Promiscuous` to `Reject`, and `MAC address changes` to `Reject`.
-- If environment is deployed to a vSAN in the hosting vCenter:
-  ```bash
-  esxcli system settings advanced set -o /VSAN/FakeSCSIReservations -i 1
-  ```
-- [`platform.yaml`](https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L1360) which defines the topology to be deployed
+This is version 2.0 - a complete architectural rewrite following Ansible best practices:
 
-### Environment Variables
+- ✅ **Idempotent**: Re-run safely without delete/recreate
+- ✅ **Modular**: 7 focused roles for maximum reusability
+- ✅ **Tested**: Molecule unit tests + integration tests
+- ✅ **Production-Ready**: Comprehensive error handling, retry logic, structured logging
+- ✅ **Secrets Management**: Ansible Vault integration
+- ✅ **CI/CD**: GitHub Actions workflows for automated testing
 
-- `GOVC_URL`                 - URL of the vCenter hosting the nested environment
-- `GOVC_USERNAME`            - Username of the account used to provision resources in the hosting environment
-- `GOVC_PASSWORD`            - Password of the account used to provision resources in the hosting environment
-- `GOVC_DATACENTER`          - Datacenter in the hosting environment where the nested environment will be deployed
-- `GOVC_DATASTORE`           - Datastore in the hosting environment where the nested environment will be deployed
-- `GOVC_CLUSTER`             - Cluster in the hosting environment where the nested environment will be deployed
-- `GOVC_NETWORK`             - Portgroup in the hosting environment where the nested environment will be deployed
-- `CLUSTER_NAME`             - Defines the prefix of the name of VMs associated with the nested environment
-- `NESTED_PASSWORD`          - the password applied to the accounts administrator@vsphere.local (vCenter) and root (ESXi)
-- `HOSTS_PER_FAILURE_DOMAIN` - optional: the number of hosts to deploy in each failure domain. default is 1
-- `VCPUS`                    - optional: the number of vCPUs assigned to the nested VMs. The resources required for the vCenter(s) are not to be included. The default is 24 vCPUs
-- `MEMORY`                   - optional: the amount of memory in GB assigned to the nested VMs. The resources required for the vCenter(s) are not to be included. The default is 96 GB
-- `DISKGB`                   - optional: the amount of disk space in GB assigned to the nested host local datastore. The resources required for the vCenter(s) are not to be included. The default is 1024 GB
+**Migrating from v1?** See [MIGRATION.md](docs/MIGRATION.md) for the automated migration guide.
 
-### Defining Media Assets
+## What Does This Do?
 
-Bespoke versions of vCenter and ESXi can deployed by defining elements in the `vc_assets` list in `group_vars/all.yml`. For example:
+Provisions complete nested vSphere environments including:
 
-```yaml
-vc_assets:
-- {
-  'name': 'VC7.0.3.01400-21477706-ESXi7.0u3q',
-  'esxiova': 'Nested_ESXi7.0u3q_Appliance_Template_v1.ova',
-  'vcenterova': 'VMware-vCenter-Server-Appliance-7.0.3.01400-21477706_OVF10.ova',
-  'httpova': "10.93.245.232:8080"
-}
-- {
-  'name': 'VC8.0.2.00100-22617221-ESXi8.0u2c', 
-  'esxiova': 'Nested_ESXi8.0u2c_Appliance_Template_v1.ova',
-  'vcenterova': 'VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova',
-  'httpova': "10.93.245.232:8080",
-  'default': "true"
-}
-```
+- **ESXi Hosts**: Nested ESXi hypervisors deployed as VMs
+- **vCenter Server**: vCenter appliance(s) deployed from OVA or content library
+- **Infrastructure**: Datacenters, clusters, DRS, HA configuration
+- **Networking**: Distributed vSwitch and port groups
+- **Storage**: VMFS and NFS datastores
+- **Topology Tags**: OpenShift region/zone tags for failure domain support
+- **Host Groups**: DRS host groups for zone affinity (optional)
 
-By default, the default asset will be chosen. If a specific version is created.
+## Quick Start
 
-### Defining Shared Datastores
+### Prerequisites
 
-Shared NFS datastores can be attached to hosts by defining them in the `vc_nfs_shares` list in `group_vars/all.yml`. For example:
+- **Ansible**: ≥ 2.15.0
+- **Python**: ≥ 3.9 with `pyvmomi` library
+- **Parent vCenter**: Existing vSphere environment to host the nested infrastructure
+- **Network**: DHCP server on the hosting environment port group
+- **Host Configuration**: Parent ESXi hosts configured for nested virtualization:
+  - Promiscuous mode: Accept
+  - MAC address changes: Accept
+  - Forged transmits: Accept
+  - (For vSAN) `esxcli system settings advanced set -o /VSAN/FakeSCSIReservations -i 1`
 
-```yaml
-vc_nfs_shares: 
-- {
-  "server": "161.26.99.159",
-  "name": "dsnested",
-  "path": "/DSW02SEV2284482_22/data01",
-  'type': 'nfs41', 
-  'nfs_ro': 'true',
-  'failure_domains': []
-}
-```
-
-By default, defined datastores are mounted to each host. If failure domains are defined, only hosts in those defined
-`failure_domains` will have the datastore mounted. `failure_domains` is an array of failure domains names.
-
-### Host Capacity Distribution
-
-`VCPUS` and `MEMORY` define the total resources to be used by _all_ of the deployed hosts. For example, if 4 hosts are deployed each host will receive (VCPUS / 4) vCPUs. 
-
-By default, only a single host is deployed per failure domain. If additional hosts are needed, the environment variable `HOSTS_PER_FAILURE_DOMAIN` can be configured to an integer which defines the number of hosts to create per failure domain.
-
-Practically, there should be a maximum of 4 hosts when using the default resource allocation. 
-
-## Running the tool
+### Installation
 
 ```bash
-# Export variables
-export GOVC_URL=...
-export GOVC_USERNAME=...
-export GOVC_PASSWORD=...
-export GOVC_DATACENTER=...
-export GOVC_DATASTORE=...
-export GOVC_CLUSTER=...
-export GOVC_NETWORK=...
-export CLUSTER_NAME=...
-export MAINVCPASSWORD=...
-export HOSTS_PER_FAILURE_DOMAIN=...
-export VCPUS=...
-export MEMORY=...
-ansible-playbook -i hosts main_nested.yml --extra-var version="VC8.0.2.00100-22617221-ESXi8.0u2c"
+# Clone the repository
+git clone https://github.com/openshift-eng/nested-ova-ansible.git
+cd nested-ova-ansible
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Install Ansible collections
+ansible-galaxy collection install -r collections/requirements.yml
+
+# Set up Ansible Vault for secrets
+cp group_vars/all/vault.yml group_vars/all/vault.yml.bak
+# Edit group_vars/all/vault.yml and replace CHANGE_ME values
+ansible-vault encrypt group_vars/all/vault.yml
 ```
 
-Note: `version` is optional if there is a `default` asset defined.
+### Configuration
 
-## Configuring Topology
+1. **Configure Parent vCenter Connection**
 
-Topology is configured by parsing the same [platform spec](https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L1360) used by the machine API, infrastructure resource, and installer in OpenShift. This allows the deployment of complex topologies. The platform spec(`platform.yaml`), by default, is located in the same directory where ansible is run.
+   Edit `group_vars/all/connection.yml`:
 
-We'll look at some common topologies. These examples are not exclusive.
+   ```yaml
+   vsphere_parent_vcenter:
+     hostname: vcenter.example.com
+     username: administrator@vsphere.local
+     password: "{{ vault_parent_vcenter_password }}"
+     datacenter: dc1
+     cluster: cluster1
+     esxi_host: esxi01.example.com
+     datastore: datastore1
+     validate_certs: false
+   ```
 
-### Single Failure Domain
+   Or use environment variables:
 
-Resource Allocation:
-- 24 vCPUs
-- 96 GB of RAM
+   ```bash
+   export GOVC_URL=vcenter.example.com
+   export GOVC_USERNAME=administrator@vsphere.local
+   export GOVC_PASSWORD=SuperSecret123
+   export GOVC_DATACENTER=dc1
+   export GOVC_CLUSTER=cluster1
+   export GOVC_DATASTORE=datastore1
+   ```
 
-`platform.yaml`:
+2. **Create Topology File**
+
+   Choose an example from `examples/` or create your own:
+
+   ```bash
+   cp examples/vsphere_topology_single_fd.yml vsphere_topology.yml
+   # Edit vsphere_topology.yml to match your environment
+   ```
+
+   See [Example Topologies](#example-topologies) below for different scenarios.
+
+3. **Configure Secrets**
+
+   Add credentials to `group_vars/all/vault.yml` (encrypted):
+
+   ```yaml
+   vault_esxi_password: "VMware1!"
+   vault_vcenter_password: "VMware1!"
+   vault_parent_vcenter_password: "SuperSecret123"
+   ```
+
+### Deployment
+
+```bash
+# Run preflight validation
+ansible-playbook playbooks/preflight.yml \
+  -e topology_file=vsphere_topology.yml \
+  --vault-password-file=.vault_pass
+
+# Deploy the environment
+ansible-playbook playbooks/deploy_nested_vsphere.yml \
+  -e topology_file=vsphere_topology.yml \
+  --vault-password-file=.vault_pass
+
+# Destroy the environment (when done)
+ansible-playbook playbooks/destroy_nested_vsphere.yml \
+  -e deployment_name=nested-vsphere \
+  --vault-password-file=.vault_pass
+```
+
+## Example Topologies
+
+The `examples/` directory contains ready-to-use topology files for common scenarios:
+
+| File | Description | ESXi Hosts | vCenters | Use Case |
+|------|-------------|------------|----------|----------|
+| [vsphere_topology_single_fd.yml](examples/vsphere_topology_single_fd.yml) | Single failure domain | 3 | 1 | Development, basic testing |
+| [vsphere_topology_multi_fd.yml](examples/vsphere_topology_multi_fd.yml) | Multiple failure domains | 6 | 1 | Multi-AZ OpenShift |
+| [vsphere_topology_hostgroup.yml](examples/vsphere_topology_hostgroup.yml) | HostGroup zone affinity | 9 | 1 | Strict zone isolation |
+| [vsphere_topology_multi_vcenter.yml](examples/vsphere_topology_multi_vcenter.yml) | Multiple vCenters | 6 | 2 | Multi-region, vCenter HA |
+
+## Architecture
+
+### Role-Based Design
+
+```
+playbooks/deploy_nested_vsphere.yml
+├── vsphere_vm_deploy              # Deploy ESXi and vCenter VMs
+├── vsphere_datacenter_config      # Configure datacenters, clusters, DRS, HA
+├── vsphere_host_config            # Add hosts to vCenter
+├── vsphere_networking             # Configure distributed vSwitch
+├── vsphere_storage                # Configure VMFS/NFS datastores
+├── vsphere_tagging                # Apply OpenShift region/zone tags
+└── vsphere_host_groups            # Create DRS host groups (HostGroup zone_type)
+```
+
+Each role is:
+- **Independent**: Can be run standalone or as part of full deployment
+- **Idempotent**: Safe to re-run without side effects
+- **Tested**: Includes Molecule tests and integration tests
+- **Documented**: Comprehensive README and variable documentation
+
+### Key Features
+
+#### Idempotency
+All roles use check-before-create patterns:
 ```yaml
-platform:
-  vsphere:
-    vcenters:
-      - server: vcenter-1
-        datacenters:
-        - cidatacenter-nested-0
-    failureDomains:
-      - server: vcenter-1
-        name: "cidatacenter-nested-0-cicluster-nested-0"
-        zone: "cidatacenter-nested-0-cicluster-nested-0"
-        region: cidatacenter-nested-0
-        topology:
-          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
-          datacenter: cidatacenter-nested-0
-          datastore: /cidatacenter-nested-0/datastore/dsnested
-          networks:
-            - "VM Network"
+- name: Check if resource exists
+  community.vmware.vmware_*_info: ...
+  register: resource_info
+
+- name: Create resource
+  community.vmware.vmware_*: ...
+  when: resource_info.* is not defined
 ```
 
-What does this provision?
-- [x] single vCenter
-    - [x] tag categories 
-    - [x] 1 datacenter
-        - [x] attach region tag
-        - [x] 1 cluster
-            - [x] attach zone tag
-            - [x] 1 resource pool
-            - [x] 1 ESXi host
-                - [x] 24 vCPUs
-                - [x] 96 GB RAM
+#### Error Handling
+- Configurable retry logic for flaky operations
+- Graceful degradation for non-critical failures
+- Structured error messages with context
 
-Note: The vCenter is deployed alongside the nested hosts, not within the nested hosts.
+#### Secrets Management
+- Ansible Vault for encrypted credentials
+- Environment variable fallback for CI/CD
+- No hardcoded passwords or IPs
 
-### Two Failure Domains in Two Clusters
+#### Backward Compatibility
+- Filter plugin converts old `platform.yaml` format
+- Can manage infrastructure deployed with v1
+- Migration tool automates v1 → v2 upgrade
 
-Resource Allocation:
-- 24 vCPUs
-- 96 GB of RAM
+## Topology File Format
 
-`platform.yaml`:
+The new `vsphere_topology.yml` format is deployment-focused (vs the OpenShift-specific `platform.yaml`):
+
 ```yaml
-platform:
-  vsphere:
-    vcenters:
-      - server: vcenter-1
-        datacenters:
-        - cidatacenter-nested-0
-    failureDomains:
-      - server: vcenter-1
-        name: "cidatacenter-nested-0-cicluster-nested-0"
-        zone: "cidatacenter-nested-0-cicluster-nested-0"
-        region: cidatacenter-nested-0
-        topology:
-          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
-          datacenter: cidatacenter-nested-0
-          datastore: /cidatacenter-nested-0/datastore/dsnested
-          networks:
-            - "VM Network"
-      - server: vcenter-1
-        name: "cidatacenter-nested-0-cicluster-nested-1"
-        zone: "cidatacenter-nested-0-cicluster-nested-1"
-        region: cidatacenter-nested-0
-        topology:
-          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-1/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-0/host/cicluster-nested-1
-          datacenter: cidatacenter-nested-0
-          datastore: /cidatacenter-nested-0/datastore/dsnested
-          networks:
-            - "VM Network"            
+deployment_name: my-lab
+region: us-east-1
+
+esxi_hosts:
+  - name: esxi01
+    ip: 192.168.1.10
+    cpu: 8
+    memory_mb: 65536
+    disk_gb: 200
+    datacenter: dc1
+    cluster: cluster1
+    # ... more settings
+
+vcenter_vms:
+  - name: vcsa01
+    hostname: vcsa01.lab.local
+    ip: 192.168.1.5
+    cpu: 8
+    memory_mb: 24576
+    datacenters:
+      - name: dc1
+        clusters:
+          - name: cluster1
+            drs_enabled: true
+    # ... more settings
+
+failure_domains:
+  - name: zone-a
+    region: us-east-1
+    zone: zone-a
+    zone_type: ComputeCluster  # or HostGroup
+    datacenter: dc1
+    cluster: cluster1
 ```
 
-What does this provision?
-- [x] vCenter: vcenter-1
-    - [x] tag categories 
-    - [x] datacenter: cidatacenter-nested-0
-        - [x] attach region tag: cidatacenter-nested-0
-        - [x] cluster: cicluster-nested-0
-            - [x] attach zone tag: cidatacenter-nested-0-cicluster-nested-0
-            - [x] 1 resource pool: ipi-ci-clusters
-            - [x] 1 ESXi host
-                - [x] 12 vCPUs
-                - [x] 48 GB RAM
-                - [x] Attach NFS Datastore(s)
-        - [x] cluster: cicluster-nested-1
-            - [x] attach zone tag: cidatacenter-nested-0-cicluster-nested-1
-            - [x] 1 resource pool: ipi-ci-clusters
-            - [x] 1 ESXi host
-                - [x] 12 vCPUs
-                - [x] 48 GB RAM
-                - [x] Attach NFS Datastore(s)
+See [VARIABLES.md](docs/VARIABLES.md) for the complete variable reference.
 
-### Two vCenters with a Single Failure Domain in Each
+## Zone Types
 
-Resource Allocation:
-- 24 vCPUs
-- 96 GB of RAM
+Two zone types are supported for failure domains:
 
-`platform.yaml`:
+### ComputeCluster (Default)
+- Tags the entire compute cluster with the zone tag
+- OpenShift distributes workloads across the cluster
+- Best for: Development, basic multi-AZ testing
+
+### HostGroup (Strict Affinity)
+- Creates DRS host groups with specific ESXi hosts
+- Tags the host group (not cluster) with the zone tag
+- OpenShift pins VMs to specific zones
+- Best for: Strict failure domain isolation, zone-specific failure testing
+
+Example HostGroup configuration:
 ```yaml
-platform:
-  vsphere:
-    vcenters:
-      - server: vcenter-1
-        datacenters:
-        - cidatacenter-nested-0
-      - server: vcenter-2
-        datacenters:
-        - cidatacenter-nested-1    
-    failureDomains:
-      - server: vcenter-1
-        name: "cidatacenter-nested-0-cicluster-nested-0"
-        zone: "cidatacenter-nested-0-cicluster-nested-0"
-        region: cidatacenter-nested-0
-        topology:
-          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
-          datacenter: cidatacenter-nested-0
-          datastore: /cidatacenter-nested-0/datastore/dsnested
-          networks:
-            - "VM Network"
-      - server: vcenter-2
-        name: "cidatacenter-nested-1-cicluster-nested-1"
-        zone: "cidatacenter-nested-1-cicluster-nested-1"
-        region: cidatacenter-nested-1
-        topology:
-          resourcePool: /cidatacenter-nested-1/host/cicluster-nested-1/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-1/host/cicluster-nested-1
-          datacenter: cidatacenter-nested-1
-          datastore: /cidatacenter-nested-1/datastore/dsnested
-          networks:
-            - "VM Network"            
+failure_domains:
+  - name: zone-a
+    zone_type: HostGroup
+    hosts:
+      - 192.168.1.10
+      - 192.168.1.11
+      - 192.168.1.12
 ```
 
-What does this provision?
-- [x] vCenter: vcenter-1
-    - [x] tag categories 
-    - [x] datacenter: cidatacenter-nested-0
-        - [x] attach region tag: cidatacenter-nested-0
-        - [x] cluster: cicluster-nested-0
-            - [x] attach zone tag: cidatacenter-nested-0-cicluster-nested-0
-            - [x] 1 resource pool: ipi-ci-clusters
-            - [x] 1 ESXi host
-                - [x] 12 vCPUs
-                - [x] 48 GB RAM
-                - [x] Attach NFS Datastore(s)
-- [x] vCenter: vcenter-2
-    - [x] tag categories 
-    - [x] datacenter: cidatacenter-nested-1
-        - [x] attach region tag: cidatacenter-nested-1
-        - [x] cluster: cicluster-nested-1
-            - [x] attach zone tag: cidatacenter-nested-1-cicluster-nested-1
-            - [x] 1 resource pool: ipi-ci-clusters
-            - [x] 1 ESXi host
-                - [x] 12 vCPUs
-                - [x] 48 GB RAM
-                - [x] Attach NFS Datastore(s)
+## Media Assets
 
-### Failure Domain with HostGroup
-
-Resource Allocation:
-- 24 vCPUs
-- 96 GB of RAM
-
-`platform.yaml`:
+### Content Library (Recommended)
+Deploy vCenter from content library items:
 ```yaml
-platform:
-  vsphere:
-    vcenters:
-      - server: vcenter-1
-        user: "administrator@vsphere.local"
-        password: "${vcenter_password}"
-        datacenters:
-        - cidatacenter-nested-0
-    failureDomains:
-      - server: vcenter-1
-        name: "cidatacenter-nested-0-cicluster-nested-0"
-        zone: "cidatacenter-nested-0-cicluster-nested-0"
-        region: cidatacenter-nested-0
-        zoneAffinity: "HostGroup"
-        topology:
-          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources/ipi-ci-clusters
-          computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
-          datacenter: cidatacenter-nested-0
-          datastore: /cidatacenter-nested-0/datastore/dsnested
-          networks:
-            - "VM Network"
+content_library:
+  name: nested-vsphere-templates
+  datastore: datastore1
+  esxi_template_item: Nested_ESXi8.0u2c_Appliance_Template_v1
+  vcenter_template_item: VMware-vCenter-Server-Appliance-8.0.2.00100
 ```
 
-What does this provision?
-- [x] vCenter: vcenter-1
-    - [x] tag categories 
-    - [x] datacenter: cidatacenter-nested-0
-        - [x] attach region tag: cidatacenter-nested-0
-        - [x] cluster: cicluster-nested-0
-        - [x] resource pool: ipi-ci-clusters
-        - [x] host group: cidatacenter-nested-0-cicluster-nested-0
-            - [x] 1 ESXi host
-            - [x] attach zone tag: cidatacenter-nested-0-cicluster-nested-0
-                - [x] 24 vCPUs
-                - [x] 96 GB RAM
+### OVA Files (Legacy)
+Define OVA locations in `group_vars/all/vsphere_defaults.yml`:
+```yaml
+vsphere_assets:
+  - name: "VC8.0.2.00100-22617221-ESXi8.0u2c"
+    esxi_ova: "Nested_ESXi8.0u2c_Appliance_Template_v1.ova"
+    esxi_ova_path: "http://10.0.1.100:8000/Nested_ESXi8.0u2c_Appliance_Template_v1.ova"
+    vcenter_ova: "VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova"
+    vcenter_ova_path: "http://10.0.1.100:8000/VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova"
+    default: true
+```
 
-### Skip Tagging Failure Domain(s)
+## Documentation
 
-Some configurations may dictate that tags not be attached to resources. For individual failiure domains, this can be done by preceding the zone or region name with a `-`. For example, `zone: "-cidatacenter-nested-0-cicluster-nested-0"` would result in the zone not being tagged for that failure domain.
+- **[DEVELOPMENT.md](docs/DEVELOPMENT.md)**: Local development setup, testing workflow
+- **[VARIABLES.md](docs/VARIABLES.md)**: Complete variable reference and precedence rules
+- **[MIGRATION.md](docs/MIGRATION.md)**: v1 to v2 migration guide
+- **[ROLES.md](docs/ROLES.md)**: Detailed role documentation
+- **[TESTING.md](docs/TESTING.md)**: Testing strategy and guide
 
-If tagging is to be completely disabled define the environment variable `SKIP_FAILURE_DOMAIN_TAGGING=true`.
+## Development
 
-### Configuring Variables
+```bash
+# Install development dependencies
+pip install -r requirements.txt
+pip install molecule molecule-plugins[docker] ansible-lint
 
-By default, no additional variables are required. However, if `/tmp/override-vars.yaml` is present, it will be loaded and will override defaults or allow undefined variables to be defined.
+# Lint the project
+ansible-lint
+yamllint .
+
+# Test a specific role with Molecule
+cd roles/vsphere_vm_deploy
+molecule test
+
+# Run integration tests (requires vcsim or real vSphere)
+ansible-playbook tests/integration/full_deployment/test_single_fd.yml
+```
+
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the complete development guide.
+
+## CI/CD
+
+GitHub Actions workflows automatically test all changes:
+
+- **Linting**: `ansible-lint`, `yamllint`
+- **Molecule Tests**: All 7 roles tested with vcsim
+- **Syntax Checks**: Playbook syntax validation
+- **Security**: Trivy vulnerability scanning
+- **Documentation**: Markdown link checking
+
+See [.github/workflows/test.yml](.github/workflows/test.yml) for the complete CI configuration.
+
+## Troubleshooting
+
+### Enable Debug Mode
+```yaml
+# In your topology file or as -e flag
+vsphere_debug_mode: true
+```
+
+### Check Deployment State
+```bash
+# View saved deployment state
+cat state/my-deployment_deployment.yml
+```
+
+### Common Issues
+
+**Issue**: VMs not getting IP addresses
+- **Solution**: Verify DHCP is enabled on the parent port group
+
+**Issue**: vCenter deployment times out
+- **Solution**: Increase `vm_wait_timeout` in topology file (default: 900s)
+
+**Issue**: Host addition fails
+- **Solution**: Check ESXi hosts are accessible and credentials are correct
+
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md#troubleshooting) for more troubleshooting tips.
+
+## Contributing
+
+Contributions welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `ansible-lint` and `molecule test`
+5. Submit a pull request
+
+All PRs must pass CI checks before merging.
+
+## License
+
+Apache 2.0
+
+## Acknowledgments
+
+- OpenShift SPLAT Team
+- Community VMware Ansible Collection maintainers
+- William Lam's nested ESXi appliance
+- All contributors to this project
+
+## Support
+
+- **Issues**: https://github.com/openshift-eng/nested-ova-ansible/issues
+- **Discussions**: https://github.com/openshift-eng/nested-ova-ansible/discussions
+- **Documentation**: [docs/](docs/)
+
+---
+
+**Previous Version (v1)**: The v1 monolithic playbooks are available in the `main` branch (deprecated). New deployments should use v2 (this branch).
