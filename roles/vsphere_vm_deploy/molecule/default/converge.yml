@@ -1,0 +1,20 @@
+---
+- name: Converge
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include vsphere_vm_deploy role
+      ansible.builtin.include_role:
+        name: vsphere_vm_deploy
+      vars:
+        vsphere_vm_deploy_parent_vcenter:
+          hostname: "{{ lookup('env', 'VCENTER_HOSTNAME') | default('localhost', true) }}"
+          username: "{{ lookup('env', 'VCENTER_USERNAME') | default('user', true) }}"
+          password: "{{ lookup('env', 'VCENTER_PASSWORD') | default('pass', true) }}"
+          validate_certs: false
+          datacenter: dc1
+          cluster: cluster1
+          datastore: datastore1
+          network: VM Network
+        vsphere_vm_deploy_esxi_hosts: []
+        vsphere_vm_deploy_vcenter_vms: []

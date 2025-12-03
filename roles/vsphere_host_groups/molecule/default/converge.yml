@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include vsphere_host_groups role
+      ansible.builtin.include_role:
+        name: vsphere_host_groups
+      vars:
+        vsphere_host_groups_vcenter:
+          hostname: "{{ lookup('env', 'VCENTER_HOSTNAME') | default('localhost', true) }}"
+          username: "{{ lookup('env', 'VCENTER_USERNAME') | default('user', true) }}"
+          password: "{{ lookup('env', 'VCENTER_PASSWORD') | default('pass', true) }}"
+          validate_certs: false
+        vsphere_host_groups_failure_domains: []

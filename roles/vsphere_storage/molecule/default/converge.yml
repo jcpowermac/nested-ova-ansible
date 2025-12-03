@@ -1,0 +1,16 @@
+---
+- name: Converge
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include vsphere_storage role
+      ansible.builtin.include_role:
+        name: vsphere_storage
+      vars:
+        vsphere_storage_vcenter:
+          hostname: "{{ lookup('env', 'VCENTER_HOSTNAME') | default('localhost', true) }}"
+          username: "{{ lookup('env', 'VCENTER_USERNAME') | default('user', true) }}"
+          password: "{{ lookup('env', 'VCENTER_PASSWORD') | default('pass', true) }}"
+          validate_certs: false
+        vsphere_storage_vmfs_datastores: []
+        vsphere_storage_nfs_datastores: []

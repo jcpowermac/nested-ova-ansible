@@ -57,6 +57,9 @@ skip_list:
   - name[template]
   - key-order
 
+  # Skip role-name - Galaxy namespace requirements not critical for this project
+  - role-name
+
 # Enable specific rules
 enable_list:
   - args

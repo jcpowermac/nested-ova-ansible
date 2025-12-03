@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include vsphere_networking role
+      ansible.builtin.include_role:
+        name: vsphere_networking
+      vars:
+        vsphere_networking_vcenter:
+          hostname: "{{ lookup('env', 'VCENTER_HOSTNAME') | default('localhost', true) }}"
+          username: "{{ lookup('env', 'VCENTER_USERNAME') | default('user', true) }}"
+          password: "{{ lookup('env', 'VCENTER_PASSWORD') | default('pass', true) }}"
+          validate_certs: false
+        vsphere_networking_dvswitches: []
