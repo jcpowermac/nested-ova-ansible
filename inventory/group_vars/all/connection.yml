@@ -1,0 +1,12 @@
+---
+vsphere_parent_vcenter:
+  hostname: vcenter.ci.ibmc.devcluster.openshift.com
+  username: jcallen@ci.ibmc.devcluster.openshift.com
+  password: "{{ vault_parent_vcenter_password }}"
+  datacenter: cidatacenter
+  cluster: cicluster
+  esxi_host: ci-vmware-host-0.ci.ibmc.devcluster.openshift.com
+  datastore: vsanDatastore
+  folder: /nested
+  network: "ci-vlan-981-testing"  # Must have DHCP enabled
+  validate_certs: false

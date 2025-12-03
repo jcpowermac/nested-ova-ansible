@@ -132,7 +132,7 @@
         that:
           - _parent_vcenter_info is succeeded
         fail_msg: "Cannot connect to parent vCenter: {{ vsphere_parent_vcenter.hostname }}"
-        success_msg: "Parent vCenter connection successful ({{ _parent_vcenter_info.about_info.fullName }})"
+        success_msg: "Parent vCenter connection successful"
 
     # Validation 8: Check parent vCenter resources
     - name: Get parent vCenter datacenter info
@@ -176,22 +176,26 @@
             success_msg: "vCenter OVA source configured"
       when: preflight_strict_mode | bool
 
-    # Validation 10: Check for IP address conflicts
+    # Validation 10: Check for IP address conflicts (only for static IP deployments)
     - name: Check for duplicate IP addresses in topology
       ansible.builtin.assert:
         that:
-          - (_topology.esxi_hosts | map(attribute='ip') | list) | unique | length == (_topology.esxi_hosts | length)
+          - (_topology.esxi_hosts | selectattr('ip', 'defined') | map(attribute='ip') | list) | unique | length == (_topology.esxi_hosts | selectattr('ip', 'defined') | length)
         fail_msg: "Duplicate ESXi IP addresses detected in topology"
         success_msg: "No duplicate ESXi IP addresses"
-      when: preflight_strict_mode | bool
+      when:
+        - preflight_strict_mode | bool
+        - _topology.esxi_hosts | selectattr('ip', 'defined') | list | length > 0
 
     - name: Check for duplicate vCenter IP addresses
       ansible.builtin.assert:
         that:
-          - (_topology.vcenter_vms | map(attribute='ip') | list) | unique | length == (_topology.vcenter_vms | length)
+          - (_topology.vcenter_vms | selectattr('ip', 'defined') | map(attribute='ip') | list) | unique | length == (_topology.vcenter_vms | selectattr('ip', 'defined') | length)
         fail_msg: "Duplicate vCenter IP addresses detected in topology"
         success_msg: "No duplicate vCenter IP addresses"
-      when: preflight_strict_mode | bool
+      when:
+        - preflight_strict_mode | bool
+        - _topology.vcenter_vms | selectattr('ip', 'defined') | list | length > 0
 
     # Validation 11: Check VM naming conflicts
     - name: Check for VM name conflicts in parent vCenter
