@@ -8,6 +8,12 @@
   vars:
     topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
     preflight_strict_mode: "{{ lookup('env', 'PREFLIGHT_STRICT_MODE') | default('true', true) | bool }}"
+    # Resolve topology file path relative to project root
+    _topology_file_path: >-
+      {{
+        topology_file if topology_file.startswith('/')
+        else playbook_dir ~ '/../' ~ topology_file
+      }}
 
   tasks:
     # Validation 1: Check Ansible version
@@ -60,7 +66,7 @@
     # Validation 4: Check Python dependencies
     - name: Check for pyvmomi library
       ansible.builtin.command:
-        cmd: python3 -c "import pyVmomi"
+        cmd: "{{ ansible_playbook_python }} -c \"import pyVmomi\""
       register: _pyvmomi_check
       changed_when: false
       failed_when: false
@@ -75,19 +81,19 @@
     # Validation 5: Load and validate topology file
     - name: Check topology file exists
       ansible.builtin.stat:
-        path: "{{ topology_file }}"
+        path: "{{ _topology_file_path }}"
       register: _topology_stat
 
     - name: Validate topology file exists
       ansible.builtin.assert:
         that:
           - _topology_stat.stat.exists
-        fail_msg: "Topology file not found: {{ topology_file }}"
-        success_msg: "Topology file found: {{ topology_file }}"
+        fail_msg: "Topology file not found: {{ topology_file }} (resolved to: {{ _topology_file_path }})"
+        success_msg: "Topology file found: {{ _topology_file_path }}"
 
     - name: Load topology configuration
       ansible.builtin.include_vars:
-        file: "{{ topology_file }}"
+        file: "{{ _topology_file_path }}"
         name: _topology
 
     # Validation 6: Validate topology structure

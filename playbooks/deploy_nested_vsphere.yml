@@ -8,17 +8,23 @@
   vars:
     # Load topology file (can be overridden via -e topology_file=path/to/file.yml)
     topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
+    # Resolve topology file path relative to project root
+    _topology_file_path: >-
+      {{
+        topology_file if topology_file.startswith('/')
+        else playbook_dir ~ '/../' ~ topology_file
+      }}
 
   pre_tasks:
     - name: Validate topology file exists
       ansible.builtin.stat:
-        path: "{{ topology_file }}"
+        path: "{{ _topology_file_path }}"
       register: _topology_file_stat
       failed_when: not _topology_file_stat.stat.exists
 
     - name: Load topology configuration
       ansible.builtin.include_vars:
-        file: "{{ topology_file }}"
+        file: "{{ _topology_file_path }}"
         name: _topology
 
     - name: Display deployment information

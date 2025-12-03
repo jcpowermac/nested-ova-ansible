@@ -10,6 +10,12 @@
     deployment_name: "{{ lookup('env', 'DEPLOYMENT_NAME') | default('nested-vsphere', true) }}"
     state_file: "{{ playbook_dir }}/../state/{{ deployment_name }}_deployment.yml"
     topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
+    # Resolve topology file path relative to project root
+    _topology_file_path: >-
+      {{
+        topology_file if topology_file.startswith('/')
+        else playbook_dir ~ '/../' ~ topology_file
+      }}
 
     # Destroy mode: 'soft' removes config but keeps VMs, 'hard' removes everything
     destroy_mode: "{{ lookup('env', 'DESTROY_MODE') | default('hard', true) }}"
@@ -28,7 +34,7 @@
 
     - name: Load topology file as fallback
       ansible.builtin.include_vars:
-        file: "{{ topology_file }}"
+        file: "{{ _topology_file_path }}"
         name: _topology
       when: not _state_file_stat.stat.exists
 
