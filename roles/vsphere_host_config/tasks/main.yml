@@ -14,13 +14,12 @@
   ansible.builtin.assert:
     that:
       - vsphere_host_config_esxi_hosts is defined
-      - vsphere_host_config_esxi_hosts | length > 0
-    fail_msg: "ESXi hosts list must be provided"
+    fail_msg: "ESXi hosts list must be defined"
     quiet: true
 
 - name: Log host configuration start
   ansible.builtin.debug:
-    msg: "Starting host configuration"
+    msg: "Starting host configuration - {{ vsphere_host_config_esxi_hosts | length }} hosts"
   when: vsphere_host_config_debug
 
 - name: Add ESXi hosts to vCenter
@@ -30,6 +29,7 @@
   loop_control:
     loop_var: esxi_host
     label: "{{ esxi_host.hostname }}"
+  when: vsphere_host_config_esxi_hosts | length > 0
 
 - name: Configure power management
   ansible.builtin.include_tasks:
