@@ -38,7 +38,7 @@
   tasks:
     # Phase 1: Deploy Virtual Machines (ESXi hosts and vCenter appliances)
     - name: "Phase 1: Deploy ESXi and vCenter VMs"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_vm_deploy
       vars:
         vsphere_vm_deploy_parent_vcenter: "{{ vsphere_parent_vcenter }}"
@@ -50,7 +50,7 @@
 
     # Phase 2: Configure Datacenter and Cluster Infrastructure
     - name: "Phase 2: Configure Datacenters and Clusters"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_datacenter_config
       vars:
         vsphere_datacenter_config_vcenter: "{{ item }}"
@@ -63,7 +63,7 @@
 
     # Phase 3: Add ESXi Hosts to vCenter
     - name: "Phase 3: Add ESXi Hosts to Clusters"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_host_config
       vars:
         vsphere_host_config_vcenter: "{{ item }}"
@@ -76,7 +76,7 @@
 
     # Phase 4: Configure Networking (Distributed vSwitch)
     - name: "Phase 4: Configure Distributed vSwitch"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_networking
       vars:
         vsphere_networking_vcenter: "{{ item }}"
@@ -91,7 +91,7 @@
 
     # Phase 5: Configure Storage (VMFS and NFS)
     - name: "Phase 5: Configure Datastores"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_storage
       vars:
         vsphere_storage_vcenter: "{{ item.vcenter }}"
@@ -106,7 +106,7 @@
 
     # Phase 6: Configure OpenShift Topology Tags
     - name: "Phase 6: Create OpenShift Region/Zone Tags"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_tagging
       vars:
         vsphere_tagging_vcenter: "{{ item }}"
@@ -122,7 +122,7 @@
 
     # Phase 7: Configure DRS Host Groups (for HostGroup zone_type)
     - name: "Phase 7: Create DRS Host Groups"
-      ansible.builtin.import_role:
+      ansible.builtin.include_role:
         name: vsphere_host_groups
       vars:
         vsphere_host_groups_vcenter: "{{ item }}"

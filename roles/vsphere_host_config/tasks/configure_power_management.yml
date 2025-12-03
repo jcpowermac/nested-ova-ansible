@@ -7,15 +7,12 @@
     username: "{{ vsphere_host_config_vcenter.username }}"
     password: "{{ vsphere_host_config_vcenter.password }}"
     validate_certs: "{{ vsphere_host_config_vcenter.validate_certs }}"
-    cluster_name: "{{ item.cluster }}"
+    cluster_name: "{{ cluster_name }}"
     policy: "{{ vsphere_host_config_power_policy }}"
   loop: "{{ vsphere_host_config_esxi_hosts | map(attribute='cluster') | unique | list }}"
   loop_control:
-    label: "{{ item }}"
-  vars:
-    item: "{{ {'cluster': item_cluster} }}"
-  loop_control:
-    loop_var: item_cluster
+    loop_var: cluster_name
+    label: "{{ cluster_name }}"
 
 - name: Log power management configuration
   ansible.builtin.debug:
