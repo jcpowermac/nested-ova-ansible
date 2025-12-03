@@ -3,16 +3,20 @@
 
 - name: "vCenter {{ vcenter_vm.name }} - Set resource values"
   ansible.builtin.set_fact:
-    _vcenter_memory_mb: "{{ vcenter_vm.memory_mb | default(vsphere_vm_deploy_vcenter_memory_mb) }}"
-    _vcenter_cpu: "{{ vcenter_vm.cpu | default(vsphere_vm_deploy_vcenter_cpu) }}"
-    _vcenter_deployment_size: "{{ vcenter_vm.deployment_size | default(vsphere_vm_deploy_vcenter_deployment_size) }}"
-    _vcenter_network: "{{ vcenter_vm.network | default(vsphere_vm_deploy_parent_vcenter.network) }}"
-    _vcenter_ova_name: "{{ vsphere_vm_deploy_vcenter_ova_name | regex_replace('\\.ova$', '') }}"
-    _vcenter_guest_id: "{{ vsphere_vm_deploy_guest_id_v8 if '8' in vsphere_vm_deploy_vcenter_ova_name else vsphere_vm_deploy_guest_id_v7 }}"
+    vsphere_vm_deploy_vcenter_memory_mb_var: "{{ vcenter_vm.memory_mb | default(vsphere_vm_deploy_vcenter_memory_mb) }}"
+    vsphere_vm_deploy_vcenter_cpu_var: "{{ vcenter_vm.cpu | default(vsphere_vm_deploy_vcenter_cpu) }}"
+    vsphere_vm_deploy_vcenter_deployment_size_var: "{{ vcenter_vm.deployment_size | default(vsphere_vm_deploy_vcenter_deployment_size) }}"
+    vsphere_vm_deploy_vcenter_network_var: "{{ vcenter_vm.network | default(vsphere_vm_deploy_parent_vcenter.network) }}"
+    vsphere_vm_deploy_vcenter_ova_name_var: "{{ vsphere_vm_deploy_vcenter_ova_name | regex_replace('\\.ova$', '') }}"
+    vsphere_vm_deploy_vcenter_guest_id_var: "{{ vsphere_vm_deploy_guest_id_v8 if '8' in vsphere_vm_deploy_vcenter_ova_name else vsphere_vm_deploy_guest_id_v7 }}"
 
 - name: "vCenter {{ vcenter_vm.name }} - Log deployment parameters"
   ansible.builtin.debug:
-    msg: "Deploying vCenter VM: {{ vcenter_vm.name }}, Size: {{ _vcenter_deployment_size }}, Memory: {{ _vcenter_memory_mb }}MB, CPU: {{ _vcenter_cpu }}"
+    msg: >-
+      Deploying vCenter VM: {{ vcenter_vm.name }},
+      Size: {{ vsphere_vm_deploy_vcenter_deployment_size_var }},
+      Memory: {{ vsphere_vm_deploy_vcenter_memory_mb_var }}MB,
+      CPU: {{ vsphere_vm_deploy_vcenter_cpu_var }}
   when: vsphere_vm_deploy_debug
 
 - name: "vCenter {{ vcenter_vm.name }} - Check if VM already exists"
@@ -23,7 +27,7 @@
     validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
     name: "{{ vcenter_vm.name }}"
-  register: _vcenter_vm_info
+  register: vsphere_vm_deploy_vcenter_vm_info
   failed_when: false
   changed_when: false
 
@@ -36,13 +40,13 @@
         password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
         validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
         library_name: "{{ vsphere_vm_deploy_content_library }}"
-        library_item_name: "{{ _vcenter_ova_name }}"
+        library_item_name: "{{ vsphere_vm_deploy_vcenter_ova_name_var }}"
         vm_name: "{{ vcenter_vm.name }}"
         datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
         cluster: "{{ vsphere_vm_deploy_parent_vcenter.cluster }}"
         datastore: "{{ vsphere_vm_deploy_parent_vcenter.datastore }}"
         folder: "{{ vsphere_vm_deploy_parent_vcenter.folder }}"
-      register: _vcenter_deploy_result
+      register: vsphere_vm_deploy_vcenter_deploy_result
 
     - name: "vCenter {{ vcenter_vm.name }} - Configure network adapter"
       community.vmware.vmware_guest_network:
@@ -53,7 +57,7 @@
         datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
         name: "{{ vcenter_vm.name }}"
         state: present
-        network_name: "{{ _vcenter_network }}"
+        network_name: "{{ vsphere_vm_deploy_vcenter_network_var }}"
         connected: true
         label: "Network adapter 1"
         device_type: "{{ vsphere_vm_deploy_network_adapter_type }}"
@@ -67,7 +71,7 @@
         name: "{{ vcenter_vm.name }}"
         vapp_properties:
           - id: DeploymentOption.value
-            value: "{{ _vcenter_deployment_size }}"
+            value: "{{ vsphere_vm_deploy_vcenter_deployment_size_var }}"
             userConfigurable: true
           - id: guestinfo.cis.appliance.net.addr.family
             value: ipv4
@@ -93,9 +97,9 @@
           - id: guestinfo.cis.appliance.ssh.enabled
             value: "True"
             userConfigurable: true
-      register: _vcenter_config_result
+      register: vsphere_vm_deploy_vcenter_config_result
 
-  when: _vcenter_vm_info.instance is not defined or vsphere_vm_deploy_force_recreate | bool
+  when: vsphere_vm_deploy_vcenter_vm_info.instance is not defined or vsphere_vm_deploy_force_recreate | bool
 
 - name: "vCenter {{ vcenter_vm.name }} - Update existing VM (if needed)"
   community.vmware.vmware_guest:
@@ -107,13 +111,13 @@
     name: "{{ vcenter_vm.name }}"
     state: present
     hardware:
-      memory_mb: "{{ _vcenter_memory_mb }}"
-      num_cpus: "{{ _vcenter_cpu }}"
-  register: _vcenter_update_result
+      memory_mb: "{{ vsphere_vm_deploy_vcenter_memory_mb_var }}"
+      num_cpus: "{{ vsphere_vm_deploy_vcenter_cpu_var }}"
+  register: vsphere_vm_deploy_vcenter_update_result
   when:
-    - _vcenter_vm_info.instance is defined
+    - vsphere_vm_deploy_vcenter_vm_info.instance is defined
     - not (vsphere_vm_deploy_force_recreate | bool)
-  changed_when: _vcenter_update_result.changed | default(false)
+  changed_when: vsphere_vm_deploy_vcenter_update_result.changed | default(false)
 
 - name: "vCenter {{ vcenter_vm.name }} - Power on VM"
   community.vmware.vmware_guest:
@@ -126,7 +130,7 @@
     state: poweredon
     wait_for_ip_address: true
     wait_for_ip_address_timeout: "{{ vsphere_vm_deploy_wait_for_ip_timeout }}"
-  register: _vcenter_poweron_result
+  register: vsphere_vm_deploy_vcenter_poweron_result
 
 - name: "vCenter {{ vcenter_vm.name }} - Get VM info with IP address"
   community.vmware.vmware_guest_info:
@@ -136,36 +140,36 @@
     validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
     name: "{{ vcenter_vm.name }}"
-  register: _vcenter_vm_final_info
-  until: _vcenter_vm_final_info.instance.ipv4 is defined and _vcenter_vm_final_info.instance.ipv4 | length > 0
+  register: vsphere_vm_deploy_vcenter_vm_final_info
+  until: vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 is defined and vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 | length > 0
   retries: "{{ vsphere_vm_deploy_wait_for_ip_retries }}"
   delay: "{{ vsphere_vm_deploy_wait_for_ip_delay }}"
   changed_when: false
 
 - name: "vCenter {{ vcenter_vm.name }} - Log IP address"
   ansible.builtin.debug:
-    msg: "vCenter {{ vcenter_vm.name }} deployed successfully with IP: {{ _vcenter_vm_final_info.instance.ipv4 }}"
+    msg: "vCenter {{ vcenter_vm.name }} deployed successfully with IP: {{ vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 }}"
 
 - name: "vCenter {{ vcenter_vm.name }} - Add to dynamic inventory"
   ansible.builtin.add_host:
     name: "{{ vcenter_vm.name }}"
     groups: deployed_vcenter
-    ansible_host: "{{ _vcenter_vm_final_info.instance.ipv4 }}"
-    vcenter_ip: "{{ _vcenter_vm_final_info.instance.ipv4 }}"
+    ansible_host: "{{ vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 }}"
+    vcenter_ip: "{{ vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 }}"
     vcenter_username: "administrator@{{ vsphere_vm_deploy_nested_vcenter_domain }}"
     vcenter_password: "{{ vsphere_vm_deploy_nested_password }}"
 
 - name: "vCenter {{ vcenter_vm.name }} - Wait for vCenter API to be ready"
   community.vmware.vmware_about_info:
-    hostname: "{{ _vcenter_vm_final_info.instance.ipv4 }}"
+    hostname: "{{ vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 }}"
     username: "administrator@{{ vsphere_vm_deploy_nested_vcenter_domain }}"
     password: "{{ vsphere_vm_deploy_nested_password }}"
     validate_certs: false
   retries: 30
   delay: 60
-  register: _vcenter_api_result
-  until: _vcenter_api_result is succeeded
+  register: vsphere_vm_deploy_vcenter_api_result
+  until: vsphere_vm_deploy_vcenter_api_result is succeeded
 
 - name: "vCenter {{ vcenter_vm.name }} - Log vCenter version"
   ansible.builtin.debug:
-    msg: "vCenter {{ vcenter_vm.name }} is ready - Version: {{ _vcenter_api_result.about.fullName }}"
+    msg: "vCenter {{ vcenter_vm.name }} is ready - Version: {{ vsphere_vm_deploy_vcenter_api_result.about.fullName }}"

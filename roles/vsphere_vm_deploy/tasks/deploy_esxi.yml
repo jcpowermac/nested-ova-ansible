@@ -3,15 +3,15 @@
 
 - name: "ESXi {{ esxi_host.name }} - Set resource values"
   ansible.builtin.set_fact:
-    _esxi_memory_mb: "{{ esxi_host.memory_mb | default(vsphere_vm_deploy_esxi_memory_mb) }}"
-    _esxi_cpu: "{{ esxi_host.cpu | default(vsphere_vm_deploy_esxi_cpu) }}"
-    _esxi_disk_gb: "{{ esxi_host.disk_gb | default(vsphere_vm_deploy_esxi_disk_gb) }}"
-    _esxi_networks: "{{ esxi_host.networks | default([{'name': vsphere_vm_deploy_parent_vcenter.network, 'connected': true}]) }}"
-    _esxi_template_name: "{{ vsphere_vm_deploy_esxi_template_prefix }}-{{ vsphere_vm_deploy_parent_vcenter.cluster }}"
+    vsphere_vm_deploy_esxi_memory_mb_var: "{{ esxi_host.memory_mb | default(vsphere_vm_deploy_esxi_memory_mb) }}"
+    vsphere_vm_deploy_esxi_cpu_var: "{{ esxi_host.cpu | default(vsphere_vm_deploy_esxi_cpu) }}"
+    vsphere_vm_deploy_esxi_disk_gb_var: "{{ esxi_host.disk_gb | default(vsphere_vm_deploy_esxi_disk_gb) }}"
+    vsphere_vm_deploy_esxi_networks_var: "{{ esxi_host.networks | default([{'name': vsphere_vm_deploy_parent_vcenter.network, 'connected': true}]) }}"
+    vsphere_vm_deploy_esxi_template_name: "{{ vsphere_vm_deploy_esxi_template_prefix }}-{{ vsphere_vm_deploy_parent_vcenter.cluster }}"
 
 - name: "ESXi {{ esxi_host.name }} - Log deployment parameters"
   ansible.builtin.debug:
-    msg: "Deploying ESXi VM: {{ esxi_host.name }}, Memory: {{ _esxi_memory_mb }}MB, CPU: {{ _esxi_cpu }}, Disk: {{ _esxi_disk_gb }}GB"
+    msg: "Deploying ESXi VM: {{ esxi_host.name }}, Memory: {{ vsphere_vm_deploy_esxi_memory_mb_var }}MB, CPU: {{ vsphere_vm_deploy_esxi_cpu_var }}, Disk: {{ vsphere_vm_deploy_esxi_disk_gb_var }}GB"
   when: vsphere_vm_deploy_debug
 
 - name: "ESXi {{ esxi_host.name }} - Check if VM already exists"
@@ -22,7 +22,7 @@
     validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
     name: "{{ esxi_host.name }}"
-  register: _esxi_vm_info
+  register: vsphere_vm_deploy_esxi_vm_info
   failed_when: false
   changed_when: false
 
@@ -34,7 +34,7 @@
         username: "{{ vsphere_vm_deploy_parent_vcenter.username }}"
         password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
         validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
-        template: "{{ _esxi_template_name }}"
+        template: "{{ vsphere_vm_deploy_esxi_template_name }}"
         state: poweredoff
         cluster: "{{ vsphere_vm_deploy_parent_vcenter.cluster }}"
         datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
@@ -45,14 +45,14 @@
           - id: guestinfo.password
             value: "{{ vsphere_vm_deploy_nested_password }}"
         hardware:
-          memory_mb: "{{ _esxi_memory_mb }}"
-          num_cpu_cores_per_socket: "{{ _esxi_cpu }}"
-          num_cpus: "{{ _esxi_cpu }}"
+          memory_mb: "{{ vsphere_vm_deploy_esxi_memory_mb_var }}"
+          num_cpu_cores_per_socket: "{{ vsphere_vm_deploy_esxi_cpu_var }}"
+          num_cpus: "{{ vsphere_vm_deploy_esxi_cpu_var }}"
           nested_virt: true
           version: "{{ vsphere_vm_deploy_vm_version }}"
           cpu_shares_level: "{{ vsphere_vm_deploy_cpu_shares_level }}"
           mem_shares_level: "{{ vsphere_vm_deploy_mem_shares_level }}"
-      register: _esxi_deploy_result
+      register: vsphere_vm_deploy_esxi_deploy_result
 
     - name: "ESXi {{ esxi_host.name }} - Configure network adapters"
       community.vmware.vmware_guest_network:
@@ -67,7 +67,7 @@
         connected: "{{ item.connected | default(true) }}"
         label: "Network adapter {{ idx + 1 }}"
         device_type: "{{ vsphere_vm_deploy_network_adapter_type }}"
-      loop: "{{ _esxi_networks }}"
+      loop: "{{ vsphere_vm_deploy_esxi_networks_var }}"
       loop_control:
         index_var: idx
         label: "{{ item.name }}"
@@ -84,12 +84,12 @@
           - unit_number: "{{ vsphere_vm_deploy_disk_unit_number }}"
             controller_number: "{{ vsphere_vm_deploy_disk_controller_number }}"
             controller_type: "{{ vsphere_vm_deploy_disk_controller_type }}"
-            size_gb: "{{ _esxi_disk_gb }}"
+            size_gb: "{{ vsphere_vm_deploy_esxi_disk_gb_var }}"
             type: "{{ vsphere_vm_deploy_disk_type }}"
         state: present
-      when: _esxi_disk_gb | int > 0
+      when: vsphere_vm_deploy_esxi_disk_gb_var | int > 0
 
-  when: _esxi_vm_info.instance is not defined or vsphere_vm_deploy_force_recreate | bool
+  when: vsphere_vm_deploy_esxi_vm_info.instance is not defined or vsphere_vm_deploy_force_recreate | bool
 
 - name: "ESXi {{ esxi_host.name }} - Update existing VM hardware (if needed)"
   community.vmware.vmware_guest:
@@ -101,13 +101,13 @@
     name: "{{ esxi_host.name }}"
     state: present
     hardware:
-      memory_mb: "{{ _esxi_memory_mb }}"
-      num_cpus: "{{ _esxi_cpu }}"
-  register: _esxi_update_result
+      memory_mb: "{{ vsphere_vm_deploy_esxi_memory_mb_var }}"
+      num_cpus: "{{ vsphere_vm_deploy_esxi_cpu_var }}"
+  register: vsphere_vm_deploy_esxi_update_result
   when:
-    - _esxi_vm_info.instance is defined
+    - vsphere_vm_deploy_esxi_vm_info.instance is defined
     - not (vsphere_vm_deploy_force_recreate | bool)
-  changed_when: _esxi_update_result.changed | default(false)
+  changed_when: vsphere_vm_deploy_esxi_update_result.changed | default(false)
 
 - name: "ESXi {{ esxi_host.name }} - Power on VM"
   community.vmware.vmware_guest:
@@ -120,7 +120,7 @@
     name: "{{ esxi_host.name }}"
     state: poweredon
     wait_for_ip_address: false
-  register: _esxi_poweron_result
+  register: vsphere_vm_deploy_esxi_poweron_result
 
 - name: "ESXi {{ esxi_host.name }} - Wait for guest tools to be running"
   community.vmware.vmware_guest_info:
@@ -130,8 +130,8 @@
     validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
     name: "{{ esxi_host.name }}"
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
-  register: _esxi_guest_info
-  until: _esxi_guest_info.instance.guest_tools_status == "guestToolsRunning"
+  register: vsphere_vm_deploy_esxi_guest_info
+  until: vsphere_vm_deploy_esxi_guest_info.instance.guest_tools_status == "guestToolsRunning"
   retries: "{{ vsphere_vm_deploy_wait_for_guest_tools_retries }}"
   delay: "{{ vsphere_vm_deploy_wait_for_guest_tools_delay }}"
   changed_when: false
@@ -144,28 +144,28 @@
     validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
     name: "{{ esxi_host.name }}"
-  register: _esxi_vm_final_info
-  until: _esxi_vm_final_info.instance.ipv4 is defined and _esxi_vm_final_info.instance.ipv4 | length > 0
+  register: vsphere_vm_deploy_esxi_vm_final_info
+  until: vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 is defined and vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 | length > 0
   retries: "{{ vsphere_vm_deploy_wait_for_ip_retries }}"
   delay: "{{ vsphere_vm_deploy_wait_for_ip_delay }}"
   changed_when: false
 
 - name: "ESXi {{ esxi_host.name }} - Log IP address"
   ansible.builtin.debug:
-    msg: "ESXi {{ esxi_host.name }} deployed successfully with IP: {{ _esxi_vm_final_info.instance.ipv4 }}"
+    msg: "ESXi {{ esxi_host.name }} deployed successfully with IP: {{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }}"
 
 - name: "ESXi {{ esxi_host.name }} - Add to dynamic inventory"
   ansible.builtin.add_host:
     name: "{{ esxi_host.name }}"
     groups: deployed_esxi
-    ansible_host: "{{ _esxi_vm_final_info.instance.ipv4 }}"
-    esxi_ip: "{{ _esxi_vm_final_info.instance.ipv4 }}"
+    ansible_host: "{{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }}"
+    esxi_ip: "{{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }}"
     esxi_username: "root"
     esxi_password: "{{ vsphere_vm_deploy_nested_password }}"
 
 - name: "ESXi {{ esxi_host.name }} - Wait for ESXi API to be ready"
   ansible.builtin.wait_for:
-    host: "{{ _esxi_vm_final_info.instance.ipv4 }}"
+    host: "{{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }}"
     port: 443
     sleep: "{{ vsphere_vm_deploy_wait_for_service_sleep }}"
     timeout: "{{ vsphere_vm_deploy_wait_for_service_timeout }}"

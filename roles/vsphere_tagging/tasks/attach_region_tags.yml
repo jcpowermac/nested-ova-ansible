@@ -3,21 +3,21 @@
 
 - name: "Region {{ fd.region }} - Determine object to tag"
   ansible.builtin.set_fact:
-    _region_object_type: "{{ fd.region_type | default('Datacenter') }}"
-    _region_object_name: "{{ fd.cluster if fd.region_type | default('Datacenter') == 'ComputeCluster' else fd.datacenter }}"
+    vsphere_tagging_region_object_type: "{{ fd.region_type | default('Datacenter') }}"
+    vsphere_tagging_region_object_name: "{{ fd.cluster if fd.region_type | default('Datacenter') == 'ComputeCluster' else fd.datacenter }}"
 
-- name: "Region {{ fd.region }} - Attach tag to {{ _region_object_type }}"
+- name: "Region {{ fd.region }} - Attach tag to {{ vsphere_tagging_region_object_type }}"
   community.vmware.vmware_tag_manager:
     hostname: "{{ vsphere_tagging_vcenter.hostname }}"
     username: "{{ vsphere_tagging_vcenter.username }}"
     password: "{{ vsphere_tagging_vcenter.password }}"
     validate_certs: "{{ vsphere_tagging_vcenter.validate_certs }}"
-    object_name: "{{ _region_object_name }}"
-    object_type: "{{ vsphere_tagging_type_map[_region_object_type] }}"
+    object_name: "{{ vsphere_tagging_region_object_name }}"
+    object_type: "{{ vsphere_tagging_type_map[vsphere_tagging_region_object_type] }}"
     tag_names:
       - "{{ fd.region }}"
     state: present
   retries: "{{ vsphere_tagging_retry_count }}"
   delay: "{{ vsphere_tagging_retry_delay }}"
-  register: _region_tag_result
-  until: _region_tag_result is succeeded
+  register: vsphere_tagging_region_tag_result
+  until: vsphere_tagging_region_tag_result is succeeded

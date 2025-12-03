@@ -31,8 +31,7 @@ exclude_paths:
   - vsphere_remove.yml
 
 # Enable checking of loop variable prefixes in roles
-# Temporarily disabled - will be enforced in follow-up PR
-# loop_var_prefix: "{role}_"
+loop_var_prefix: "{role}_"
 
 # Enforce variable naming patterns
 var_naming_pattern: "^[a-z_][a-z0-9_]*$"

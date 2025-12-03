@@ -15,11 +15,14 @@
     state: present
   retries: "{{ vsphere_host_config_retry_count }}"
   delay: "{{ vsphere_host_config_retry_delay }}"
-  register: _add_host_result
-  until: _add_host_result is succeeded
+  register: vsphere_host_config_add_host_result
+  until: vsphere_host_config_add_host_result is succeeded
   failed_when:
-    - _add_host_result is failed
-    - not (_add_host_result.msg is defined and (_add_host_result.msg is search("already exists") or _add_host_result.msg is search("already a member")))
+    - vsphere_host_config_add_host_result is failed
+    - >-
+      not (vsphere_host_config_add_host_result.msg is defined and
+      (vsphere_host_config_add_host_result.msg is search("already exists") or
+      vsphere_host_config_add_host_result.msg is search("already a member")))
 
 - name: "Host {{ esxi_host.hostname }} - Log addition result"
   ansible.builtin.debug:

@@ -8,12 +8,12 @@
     password: "{{ vsphere_storage_esxi_credentials.password }}"
     validate_certs: false
     esxi_hostname: "{{ esxi_host.hostname }}"
-  register: _host_disk_info
+  register: vsphere_storage_host_disk_info
 
 - name: "Host {{ esxi_host.hostname }} - Find target disk by CTD"
   ansible.builtin.set_fact:
-    _vmfs_disk_name: "{{ item.canonical_name }}"
-  loop: "{{ _host_disk_info.hosts_disk_info[esxi_host.hostname] | default([]) }}"
+    vsphere_storage_vmfs_disk_name: "{{ item.canonical_name }}"
+  loop: "{{ vsphere_storage_host_disk_info.hosts_disk_info[esxi_host.hostname] | default([]) }}"
   loop_control:
     label: "{{ item.canonical_name }}"
   when:
@@ -28,15 +28,15 @@
     password: "{{ vsphere_storage_esxi_credentials.password }}"
     validate_certs: false
     datastore_name: "{{ vsphere_storage_vmfs_datastore_prefix }}-{{ esxi_host.hostname }}"
-    vmfs_device_name: "{{ _vmfs_disk_name }}"
+    vmfs_device_name: "{{ vsphere_storage_vmfs_disk_name }}"
     vmfs_version: "{{ vsphere_storage_vmfs_version }}"
     datastore_type: vmfs
     state: present
-  when: _vmfs_disk_name is defined
+  when: vsphere_storage_vmfs_disk_name is defined
 
 - name: "Host {{ esxi_host.hostname }} - Log datastore creation"
   ansible.builtin.debug:
     msg: "VMFS datastore created on {{ esxi_host.hostname }}: {{ vsphere_storage_vmfs_datastore_prefix }}-{{ esxi_host.hostname }}"
   when:
     - vsphere_storage_debug
-    - _vmfs_disk_name is defined
+    - vsphere_storage_vmfs_disk_name is defined

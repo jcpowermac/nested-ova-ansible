@@ -3,18 +3,18 @@
 
 - name: "vCenter {{ vcenter_vm.name }} - Get vCenter IP from hostvars"
   ansible.builtin.set_fact:
-    _vcenter_ip: "{{ hostvars[vcenter_vm.name].vcenter_ip }}"
+    vsphere_vm_deploy_vcenter_ip: "{{ hostvars[vcenter_vm.name].vcenter_ip }}"
 
 - name: "vCenter {{ vcenter_vm.name }} - Download certificate bundle"
   ansible.builtin.get_url:
-    url: "https://{{ _vcenter_ip }}/certs/download.zip"
+    url: "https://{{ vsphere_vm_deploy_vcenter_ip }}/certs/download.zip"
     dest: "{{ vsphere_vm_deploy_certificate_download_path }}/{{ vcenter_vm.name }}-certs.zip"
     validate_certs: false
     mode: '0644'
-  register: _cert_download
+  register: vsphere_vm_deploy_cert_download
   retries: 3
   delay: 10
-  until: _cert_download is succeeded
+  until: vsphere_vm_deploy_cert_download is succeeded
 
 - name: "vCenter {{ vcenter_vm.name }} - Extract certificate bundle"
   ansible.builtin.unarchive:
@@ -28,7 +28,7 @@
     paths: "{{ vsphere_vm_deploy_certificate_download_path }}/certs/lin/"
     file_type: file
     patterns: "*.0"
-  register: _cert_files
+  register: vsphere_vm_deploy_cert_files
 
 - name: "vCenter {{ vcenter_vm.name }} - Copy certificate to shared directory"
   ansible.builtin.copy:
@@ -36,12 +36,12 @@
     dest: "{{ vsphere_vm_deploy_certificate_download_path }}/{{ vcenter_vm.name }}-ca-cert.pem"
     mode: '0644'
     remote_src: true
-  loop: "{{ _cert_files.files }}"
+  loop: "{{ vsphere_vm_deploy_cert_files.files }}"
   loop_control:
     label: "{{ item.path | basename }}"
-  when: _cert_files.files | length > 0
+  when: vsphere_vm_deploy_cert_files.files | length > 0
 
 - name: "vCenter {{ vcenter_vm.name }} - Log certificate retrieval"
   ansible.builtin.debug:
     msg: "Certificate for {{ vcenter_vm.name }} saved to {{ vsphere_vm_deploy_certificate_download_path }}/{{ vcenter_vm.name }}-ca-cert.pem"
-  when: _cert_files.files | length > 0
+  when: vsphere_vm_deploy_cert_files.files | length > 0
