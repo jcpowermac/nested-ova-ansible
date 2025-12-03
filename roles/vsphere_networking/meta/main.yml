@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_networking
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Configure vSphere distributed vSwitch and port groups
   company: Red Hat

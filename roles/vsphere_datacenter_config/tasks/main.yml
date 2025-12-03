@@ -20,7 +20,7 @@
 
 - name: Log datacenter configuration start
   ansible.builtin.debug:
-    msg: "{{ 'Starting datacenter configuration' | deployment_log('INFO', {'vcenter': vsphere_datacenter_config_vcenter.hostname}) }}"
+    msg: "Starting datacenter configuration"
   when: vsphere_datacenter_config_debug
 
 - name: Create datacenters
@@ -49,5 +49,5 @@
 
 - name: Log datacenter configuration completion
   ansible.builtin.debug:
-    msg: "{{ 'Datacenter configuration completed' | deployment_log('INFO', {'datacenters': vsphere_datacenter_config_topology.datacenters | length}) }}"
+    msg: "Datacenter configuration completed"
   when: vsphere_datacenter_config_debug

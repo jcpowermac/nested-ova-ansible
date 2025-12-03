@@ -12,4 +12,5 @@
           username: "{{ lookup('env', 'VCENTER_USERNAME') | default('user', true) }}"
           password: "{{ lookup('env', 'VCENTER_PASSWORD') | default('pass', true) }}"
           validate_certs: false
-        vsphere_datacenter_config_datacenters: []
+        vsphere_datacenter_config_topology:
+          datacenters: []

@@ -23,7 +23,7 @@
 
     - name: Log host groups configuration start
       ansible.builtin.debug:
-        msg: "{{ 'Starting host groups configuration' | deployment_log('INFO', {'host_groups': _host_group_failure_domains | length}) }}"
+        msg: "Starting host groups configuration"
       when: vsphere_host_groups_debug
 
     - name: Create DRS host groups
@@ -45,5 +45,5 @@
 
     - name: Log host groups configuration complete
       ansible.builtin.debug:
-        msg: "{{ 'Host groups configuration completed' | deployment_log('INFO', {'groups_created': _host_group_failure_domains | length}) }}"
+        msg: "Host groups configuration completed"
       when: vsphere_host_groups_debug

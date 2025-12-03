@@ -11,7 +11,7 @@
 
 - name: Log networking configuration start
   ansible.builtin.debug:
-    msg: "{{ 'Starting networking configuration' | deployment_log('INFO', {'vcenter': vsphere_networking_vcenter.hostname}) }}"
+    msg: "Starting networking configuration"
   when: vsphere_networking_debug
 
 - name: Create distributed vSwitches
@@ -71,5 +71,5 @@
 
 - name: Log networking configuration complete
   ansible.builtin.debug:
-    msg: "{{ 'Networking configuration completed' | deployment_log('INFO', {'dvswitches': vsphere_networking_dvswitches | length}) }}"
+    msg: "Networking configuration completed"
   when: vsphere_networking_debug

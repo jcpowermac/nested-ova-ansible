@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_datacenter_config
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Configure vSphere datacenters, clusters, DRS, and HA
   company: Red Hat

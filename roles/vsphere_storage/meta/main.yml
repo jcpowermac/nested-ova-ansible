@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_storage
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Configure VMFS and NFS datastores on ESXi hosts
   company: Red Hat

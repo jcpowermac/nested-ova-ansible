@@ -20,7 +20,7 @@
 
 - name: Log host configuration start
   ansible.builtin.debug:
-    msg: "{{ 'Starting host configuration' | deployment_log('INFO', {'vcenter': vsphere_host_config_vcenter.hostname, 'hosts_count': vsphere_host_config_esxi_hosts | length}) }}"
+    msg: "Starting host configuration"
   when: vsphere_host_config_debug
 
 - name: Add ESXi hosts to vCenter
@@ -58,5 +58,5 @@
 
 - name: Log host configuration completion
   ansible.builtin.debug:
-    msg: "{{ 'Host configuration completed' | deployment_log('INFO', {'hosts_configured': vsphere_host_config_esxi_hosts | length}) }}"
+    msg: "Host configuration completed"
   when: vsphere_host_config_debug

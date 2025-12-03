@@ -13,7 +13,7 @@
 
 - name: Log deployment start
   ansible.builtin.debug:
-    msg: "{{ 'Starting VM deployment' | deployment_log('INFO', {'esxi_count': vsphere_vm_deploy_esxi_hosts | length, 'vcenter_count': vsphere_vm_deploy_vcenter_vms | length}) }}"
+    msg: "Starting VM deployment - ESXi hosts: {{ vsphere_vm_deploy_esxi_hosts | length }}, vCenter VMs: {{ vsphere_vm_deploy_vcenter_vms | length }}"
   when: vsphere_vm_deploy_logging_enabled
 
 - name: Deploy ESXi VMs
@@ -49,5 +49,5 @@
 
 - name: Log deployment completion
   ansible.builtin.debug:
-    msg: "{{ 'VM deployment completed successfully' | deployment_log('INFO', {'esxi_deployed': vsphere_vm_deploy_esxi_hosts | length, 'vcenter_deployed': vsphere_vm_deploy_vcenter_vms | length}) }}"
+    msg: "VM deployment completed successfully - ESXi deployed: {{ vsphere_vm_deploy_esxi_hosts | length }}, vCenter deployed: {{ vsphere_vm_deploy_vcenter_vms | length }}"
   when: vsphere_vm_deploy_logging_enabled

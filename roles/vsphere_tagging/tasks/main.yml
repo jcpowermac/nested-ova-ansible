@@ -19,7 +19,7 @@
 
     - name: Log tagging configuration start
       ansible.builtin.debug:
-        msg: "{{ 'Starting tagging configuration' | deployment_log('INFO', {'vcenter': vsphere_tagging_vcenter.hostname}) }}"
+        msg: "Starting tagging configuration"
       when: vsphere_tagging_debug
 
     - name: Create tag categories
@@ -93,5 +93,5 @@
 
     - name: Log tagging configuration complete
       ansible.builtin.debug:
-        msg: "{{ 'Tagging configuration completed' | deployment_log('INFO', {'failure_domains': vsphere_tagging_failure_domains | length}) }}"
+        msg: "Tagging configuration completed"
       when: vsphere_tagging_debug

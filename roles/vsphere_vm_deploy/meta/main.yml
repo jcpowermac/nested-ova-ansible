@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_vm_deploy
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Deploy nested ESXi and vCenter VMs on vSphere
   company: Red Hat

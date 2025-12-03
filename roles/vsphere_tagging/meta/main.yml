@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_tagging
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Configure vSphere tags for OpenShift region/zone topology
   company: Red Hat

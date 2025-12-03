@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_host_groups
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Configure DRS host groups for zone affinity
   company: Red Hat

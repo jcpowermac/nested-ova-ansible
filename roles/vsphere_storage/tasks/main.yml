@@ -3,7 +3,7 @@
 
 - name: Log storage configuration start
   ansible.builtin.debug:
-    msg: "{{ 'Starting storage configuration' | deployment_log('INFO', {'hosts': vsphere_storage_esxi_hosts | length}) }}"
+    msg: "Starting storage configuration"
   when: vsphere_storage_debug
 
 - name: Create VMFS datastores
@@ -30,5 +30,5 @@
 
 - name: Log storage configuration complete
   ansible.builtin.debug:
-    msg: "{{ 'Storage configuration completed' | deployment_log('INFO', {'vmfs_hosts': vsphere_storage_esxi_hosts | length, 'nfs_shares': vsphere_storage_nfs_shares | length}) }}"
+    msg: "Storage configuration completed"
   when: vsphere_storage_debug

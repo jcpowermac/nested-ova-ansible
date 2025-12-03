@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: vsphere_host_config
+  namespace: openshift_splat_team
   author: OpenShift SPLAT Team
   description: Add ESXi hosts to vCenter and configure host settings
   company: Red Hat
