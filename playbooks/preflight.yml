@@ -126,6 +126,7 @@
         validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
       register: _parent_vcenter_info
       failed_when: false
+      no_log: true
 
     - name: Validate parent vCenter connection
       ansible.builtin.assert:
@@ -142,6 +143,7 @@
         password: "{{ vsphere_parent_vcenter.password }}"
         validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
       register: _parent_datacenters
+      no_log: true
 
     - name: Validate parent datacenter exists
       ansible.builtin.assert:
@@ -208,6 +210,7 @@
             validate_certs: "{{ vsphere_parent_vcenter.validate_certs | default(false) }}"
           register: _parent_vms
           failed_when: false
+          no_log: true
 
         - name: Check for ESXi VM name conflicts
           ansible.builtin.assert:
