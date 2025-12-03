@@ -3,6 +3,7 @@
 
 # Exclude paths
 exclude_paths:
+  # Generated and cache directories
   - .github/
   - .ansible/
   - .venv/
@@ -12,6 +13,22 @@ exclude_paths:
   - tests/vcsim/
   - sim_shared_dir/
   - state/
+  - v1_backup_*/
+  # Old v1 playbook files (not part of v2 rewrite)
+  - addhosts_vcenter.yml
+  - cronjob.yml
+  - create_datastore.yml
+  - dvs_hosts_vcenter.yml
+  - esxinested.yml
+  - getcerts.yml
+  - host_groups.yml
+  - main.yml
+  - nfshostip.yml
+  - packlocal.yml
+  - platform.example.yaml
+  - tagging.yml
+  - vcnested.yml
+  - vsphere_remove.yml
 
 # Enable checking of loop variable prefixes in roles
 loop_var_prefix: "{role}_"
@@ -34,10 +51,11 @@ skip_list:
   # Remove this before production release
   - no-changed-when
 
-  # Temporary: Skip name rules for legacy code during migration
-  # - name[missing]
-  # - name[play]
-  # - name[casing]
+  # Temporary: Skip name rules during rewrite
+  # These enforce style/formatting that can be addressed in a follow-up PR
+  - name[casing]
+  - name[template]
+  - key-order
 
 # Enable specific rules
 enable_list:

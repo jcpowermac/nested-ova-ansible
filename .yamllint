@@ -22,6 +22,22 @@ rules:
     forbid-explicit-octal: true
 
 ignore: |
+  # Old v1 files (not part of v2)
+  addhosts_vcenter.yml
+  cronjob.yml
+  create_datastore.yml
+  dvs_hosts_vcenter.yml
+  esxinested.yml
+  getcerts.yml
+  host_groups.yml
+  main.yml
+  nfshostip.yml
+  packlocal.yml
+  platform.example.yaml
+  tagging.yml
+  vcnested.yml
+  vsphere_remove.yml
+  # Generated and cache directories
   .github/
   .ansible/
   .venv/
@@ -29,3 +45,5 @@ ignore: |
   v1_backup_*/
   state/
   molecule/
+  .cache/
+  __pycache__/

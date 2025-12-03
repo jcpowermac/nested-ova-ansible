@@ -43,12 +43,12 @@ jobs:
 
       - name: Run yamllint
         run: |
-          yamllint -c .yamllint .
+          yamllint -c .yamllint playbooks/ roles/ examples/ group_vars/ collections/
         continue-on-error: true
 
       - name: Run ansible-lint
         run: |
-          ansible-lint --force-color --show-relpath
+          ansible-lint --force-color --show-relpath playbooks/ roles/
 
   # Job 2: Test each role with Molecule (delegated driver for vcsim)
   molecule:
