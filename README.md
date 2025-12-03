@@ -33,7 +33,7 @@ Provisions complete nested vSphere environments including:
 
 ### Prerequisites
 
-- **Ansible**: ≥ 2.15.0
+- **Ansible**: ≥ 9.0.0 (includes ansible-core ≥ 2.16.0)
 - **Python**: ≥ 3.9 with `pyvmomi` library
 - **Parent vCenter**: Existing vSphere environment to host the nested infrastructure
 - **Network**: DHCP server on the hosting environment port group

@@ -95,7 +95,7 @@ check_prerequisites() {
 
     # Check Ansible
     if ! command -v ansible &> /dev/null; then
-        log_error "ansible not found. Please install Ansible 2.15 or later."
+        log_error "ansible not found. Please install Ansible 9.0+ (includes ansible-core 2.16+)."
         exit 1
     fi
 

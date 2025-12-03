@@ -14,7 +14,7 @@ on:
 env:
   ANSIBLE_FORCE_COLOR: "1"
   PYTHON_VERSION: "3.11"
-  ANSIBLE_VERSION: "2.15"
+  ANSIBLE_VERSION: "9.0"  # Includes ansible-core 2.16 (minimum maintained version)
 
 jobs:
   # Job 1: Lint all Ansible files

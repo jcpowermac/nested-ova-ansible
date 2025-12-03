@@ -14,8 +14,8 @@
     - name: Validate Ansible version
       ansible.builtin.assert:
         that:
-          - ansible_version.full is version('2.15.0', '>=')
-        fail_msg: "Ansible version must be >= 2.15.0 (current: {{ ansible_version.full }})"
+          - ansible_version.full is version('2.16.0', '>=')
+        fail_msg: "Ansible version must be >= 2.16.0 (current: {{ ansible_version.full }})"
         success_msg: "Ansible version check passed ({{ ansible_version.full }})"
 
     # Validation 2: Check Python version
