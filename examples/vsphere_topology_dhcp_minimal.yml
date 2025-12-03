@@ -1,0 +1,104 @@
+---
+# Minimal DHCP Topology for Testing
+#
+# This is the simplest possible deployment using DHCP for all VMs.
+# Perfect for quick testing and validation.
+#
+# Requirements:
+#   - DHCP server on your network
+#   - 1 ESXi host (minimal)
+#   - 1 vCenter
+#
+# All VMs will get IPs via DHCP and report them back via VMware Tools.
+
+deployment_name: dhcp-test
+region: test-region
+
+# Single ESXi Host - DHCP
+esxi_hosts:
+  - name: esxi01
+    cpu: 8
+    memory_mb: 32768  # 32 GB
+    disk_gb: 200
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+    # NO IP/mask/gw - will use DHCP
+
+# Single vCenter - DHCP
+vcenter_vms:
+  - name: vcsa01
+    hostname: vcsa01  # Short hostname, DHCP will provide FQDN
+    cpu: 8
+    memory_mb: 24576  # 24 GB
+    disk_gb: 250
+    username: administrator@vsphere.local
+    password: "{{ vault_vcenter_password }}"
+    sso_domain: vsphere.local
+    datacenter: dc1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+    # NO IP/dns/gw/domain - will use DHCP
+
+    # Datacenter Configuration
+    datacenters:
+      - name: dc1
+        clusters:
+          - name: cluster1
+            drs_enabled: true
+            ha_enabled: true
+
+    # Distributed vSwitch
+    dvswitches:
+      - name: dvSwitch
+        datacenter: dc1
+        version: 7.0.0
+        mtu: 1500
+        uplinks: 2
+        port_groups:
+          - name: VM Network
+            vlan: 0
+            num_ports: 128
+
+    # ESXi host to add to vCenter (will use DHCP IP)
+    esxi_hosts:
+      - hostname: "{{ hostvars['localhost']['esxi01_ip'] | default('esxi01') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+
+# Content Library
+content_library:
+  name: nested-vsphere-templates
+  description: OVA templates for nested vSphere deployment
+  datastore: "{{ vsphere_parent_vcenter.datastore }}"
+  esxi_template_item: Nested_ESXi8.0u2c_Appliance_Template_v1
+  vcenter_template_item: VMware-vCenter-Server-Appliance-8.0.2.00100
+
+# Single Failure Domain (optional for testing)
+failure_domains:
+  - name: zone-a
+    region: test-region
+    zone: zone-a
+    zone_type: ComputeCluster
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: "{{ hostvars['localhost']['vcsa01_ip'] | default('vcsa01') }}"
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+
+# Wait for DHCP IPs to be assigned
+wait_for_ip: true
+vm_wait_timeout: 900  # 15 minutes
+vsphere_debug_mode: true  # Enable debug to see DHCP IPs

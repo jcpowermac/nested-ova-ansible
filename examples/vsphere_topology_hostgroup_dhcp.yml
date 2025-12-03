@@ -1,0 +1,304 @@
+---
+# HostGroup Affinity Topology - DHCP Version
+#
+# This is the DHCP version of vsphere_topology_hostgroup.yml
+# - All VMs use DHCP (no static IPs)
+# - Creates 3 DRS host groups for zone affinity
+# - 9 ESXi hosts (3 per zone)
+# - Much simpler configuration
+
+deployment_name: hostgroup-dhcp
+region: us-west-1
+
+# ESXi Host Configuration (3 hosts per zone = 9 total)
+# All using DHCP - no IP/mask/gw fields needed
+esxi_hosts:
+  # Zone A hosts
+  - name: esxi-a1
+    cpu: 12
+    memory_mb: 98304  # 96 GB
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-a2
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-a3
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  # Zone B hosts
+  - name: esxi-b1
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-b2
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-b3
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  # Zone C hosts
+  - name: esxi-c1
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-c2
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+  - name: esxi-c3
+    cpu: 12
+    memory_mb: 98304
+    disk_gb: 300
+    nested_hv: true
+    username: root
+    password: "{{ vault_esxi_password }}"
+    datacenter: dc1
+    cluster: cluster1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+# vCenter Configuration - DHCP
+vcenter_vms:
+  - name: vcsa01
+    hostname: vcsa01  # DHCP will assign IP
+    cpu: 16
+    memory_mb: 49152  # 48 GB (larger cluster)
+    disk_gb: 400
+    username: administrator@vsphere.local
+    password: "{{ vault_vcenter_password }}"
+    sso_domain: vsphere.local
+    datacenter: dc1
+    folder: /nested-lab
+    parent_resource_pool: nested-vsphere
+    parent_host: "{{ vsphere_parent_vcenter.esxi_host }}"
+    parent_datastore: "{{ vsphere_parent_vcenter.datastore }}"
+
+    datacenters:
+      - name: dc1
+        clusters:
+          - name: cluster1
+            drs_enabled: true
+            drs_vmotion_rate: 3
+            drs_default_vm_behavior: fullyAutomated
+            ha_enabled: true
+            ha_admission_control: true
+            ha_host_monitoring: enabled
+            ha_vm_monitoring: vmMonitoringOnly
+
+    dvswitches:
+      - name: dvSwitch
+        datacenter: dc1
+        version: 7.0.0
+        mtu: 1500
+        uplinks: 2
+        discovery_protocol: lldp
+        discovery_operation: listen
+        port_groups:
+          - name: VM Network
+            vlan: 0
+            num_ports: 256
+          - name: Storage Network
+            vlan: 100
+            num_ports: 128
+
+    # ESXi hosts will be added using their DHCP-assigned hostnames/IPs
+    # The playbook will discover these automatically from deployed VMs
+    esxi_hosts:
+      # Zone A - will use DHCP hostnames
+      - hostname: "{{ hostvars['localhost']['esxi-a1_ip'] | default('esxi-a1') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: "{{ hostvars['localhost']['esxi-a2_ip'] | default('esxi-a2') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: "{{ hostvars['localhost']['esxi-a3_ip'] | default('esxi-a3') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      # Zone B
+      - hostname: "{{ hostvars['localhost']['esxi-b1_ip'] | default('esxi-b1') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: "{{ hostvars['localhost']['esxi-b2_ip'] | default('esxi-b2') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: "{{ hostvars['localhost']['esxi-b3_ip'] | default('esxi-b3') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      # Zone C
+      - hostname: "{{ hostvars['localhost']['esxi-c1_ip'] | default('esxi-c1') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: "{{ hostvars['localhost']['esxi-c2_ip'] | default('esxi-c2') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+      - hostname: "{{ hostvars['localhost']['esxi-c3_ip'] | default('esxi-c3') }}"
+        username: root
+        password: "{{ vault_esxi_password }}"
+        datacenter: dc1
+        cluster: cluster1
+
+content_library:
+  name: nested-vsphere-templates
+  description: OVA templates for nested vSphere deployment
+  datastore: "{{ vsphere_parent_vcenter.datastore }}"
+  esxi_template_item: Nested_ESXi8.0u2c_Appliance_Template_v1
+  vcenter_template_item: VMware-vCenter-Server-Appliance-8.0.2.00100
+
+# Failure Domains with HostGroup Configuration
+# zone_type: HostGroup creates DRS host groups for strict zone affinity
+failure_domains:
+  - name: zone-a
+    region: us-west-1
+    zone: zone-a
+    zone_type: HostGroup
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: "{{ hostvars['localhost']['vcsa01_ip'] | default('vcsa01') }}"
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    # ESXi hosts by DHCP IP/hostname - discovered dynamically
+    hosts:
+      - "{{ hostvars['localhost']['esxi-a1_ip'] | default('esxi-a1') }}"
+      - "{{ hostvars['localhost']['esxi-a2_ip'] | default('esxi-a2') }}"
+      - "{{ hostvars['localhost']['esxi-a3_ip'] | default('esxi-a3') }}"
+
+  - name: zone-b
+    region: us-west-1
+    zone: zone-b
+    zone_type: HostGroup
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: "{{ hostvars['localhost']['vcsa01_ip'] | default('vcsa01') }}"
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    hosts:
+      - "{{ hostvars['localhost']['esxi-b1_ip'] | default('esxi-b1') }}"
+      - "{{ hostvars['localhost']['esxi-b2_ip'] | default('esxi-b2') }}"
+      - "{{ hostvars['localhost']['esxi-b3_ip'] | default('esxi-b3') }}"
+
+  - name: zone-c
+    region: us-west-1
+    zone: zone-c
+    zone_type: HostGroup
+    datacenter: dc1
+    cluster: cluster1
+    vcenter:
+      hostname: "{{ hostvars['localhost']['vcsa01_ip'] | default('vcsa01') }}"
+      username: administrator@vsphere.local
+      password: "{{ vault_vcenter_password }}"
+      validate_certs: false
+    hosts:
+      - "{{ hostvars['localhost']['esxi-c1_ip'] | default('esxi-c1') }}"
+      - "{{ hostvars['localhost']['esxi-c2_ip'] | default('esxi-c2') }}"
+      - "{{ hostvars['localhost']['esxi-c3_ip'] | default('esxi-c3') }}"
+
+# Note: NFS datastores removed for simplicity - add back if needed
+
+wait_for_ip: true
+vm_wait_timeout: 1800  # 30 minutes (9 ESXi + 1 vCenter = longer wait)
+vsphere_debug_mode: true  # See DHCP IPs as they're assigned
