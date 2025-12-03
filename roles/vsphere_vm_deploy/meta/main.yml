@@ -5,7 +5,7 @@ galaxy_info:
   description: Deploy nested ESXi and vCenter VMs on vSphere
   company: Red Hat
   license: Apache-2.0
-  min_ansible_version: "2.16"
+  min_ansible_version: "2.18"
 
   platforms:
     - name: EL

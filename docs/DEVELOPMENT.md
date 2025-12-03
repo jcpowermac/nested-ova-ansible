@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **Python**: 3.9 or higher
-- **Ansible**: 9.0 or higher (includes ansible-core 2.16+)
+- **Ansible**: 11.0 or higher (includes ansible-core 2.18+)
 - **Docker**: For vcsim testing (optional but recommended)
 - **Git**: For version control
 
