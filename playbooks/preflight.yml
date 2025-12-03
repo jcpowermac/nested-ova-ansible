@@ -212,24 +212,28 @@
         - name: Check for ESXi VM name conflicts
           ansible.builtin.assert:
             that:
-              - item.name not in (_parent_vms.virtual_machines | map(attribute='guest_name') | list)
+              - item.name not in (_parent_vms.virtual_machines | default([]) | map(attribute='guest_name') | list)
             fail_msg: "VM name conflict detected: {{ item.name }} already exists in parent vCenter"
             success_msg: "No VM name conflicts for {{ item.name }}"
           loop: "{{ _topology.esxi_hosts }}"
           loop_control:
             label: "{{ item.name }}"
-          when: _parent_vms is succeeded
+          when:
+            - _parent_vms is succeeded
+            - _parent_vms.virtual_machines is defined
 
         - name: Check for vCenter VM name conflicts
           ansible.builtin.assert:
             that:
-              - item.name not in (_parent_vms.virtual_machines | map(attribute='guest_name') | list)
+              - item.name not in (_parent_vms.virtual_machines | default([]) | map(attribute='guest_name') | list)
             fail_msg: "VM name conflict detected: {{ item.name }} already exists in parent vCenter"
             success_msg: "No VM name conflicts for {{ item.name }}"
           loop: "{{ _topology.vcenter_vms }}"
           loop_control:
             label: "{{ item.name }}"
-          when: _parent_vms is succeeded
+          when:
+            - _parent_vms is succeeded
+            - _parent_vms.virtual_machines is defined
 
         - name: Warn if VM conflict check was skipped
           ansible.builtin.debug:
