@@ -116,7 +116,8 @@
     password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
     validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
-    folder: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}/vm/{{ vsphere_vm_deploy_parent_vcenter.folder }}"
+    folder: "{{ vsphere_vm_deploy_parent_vcenter.folder }}"
+    datastore: "{{ vsphere_vm_deploy_parent_vcenter.datastore }}"
     name: "{{ esxi_host.name }}"
     state: poweredon
     wait_for_ip_address: false
