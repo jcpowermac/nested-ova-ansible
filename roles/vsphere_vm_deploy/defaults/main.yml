@@ -44,7 +44,7 @@ vsphere_vm_deploy_vm_version: "{{ default_vm_hardware_version | default(21) }}"
 vsphere_vm_deploy_esxi_cpu: "{{ default_esxi_cpu | default(4) }}"
 vsphere_vm_deploy_esxi_memory_mb: "{{ default_esxi_memory_mb | default(8192) }}"
 vsphere_vm_deploy_esxi_disk_gb: "{{ default_esxi_disk_gb | default(100) }}"
-vsphere_vm_deploy_esxi_template_prefix: "{{ deployment_version | default('VC8.0.2.00100-22617221-ESXi8.0u2c') }}"
+vsphere_vm_deploy_esxi_template_prefix: "{{ default_vsphere_asset.esxi_ova | default('Nested_ESXi8.0u2c_Appliance_Template_v1.ova') }}"
 
 # vCenter defaults
 vsphere_vm_deploy_vcenter_cpu: "{{ default_vcenter_cpu | default(2) }}"
@@ -57,7 +57,7 @@ vsphere_vm_deploy_nested_vcenter_domain: "{{ nested_vsphere_domain | default('vs
 
 # Content library settings for vCenter OVA deployment
 vsphere_vm_deploy_content_library: "nested"
-vsphere_vm_deploy_vcenter_ova_name: "{{ deployment_version | default('VC8.0.2.00100-22617221-ESXi8.0u2c') }}"
+vsphere_vm_deploy_vcenter_ova_name: "{{ default_vsphere_asset.vcenter_ova | default('VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova') }}"
 
 # Network configuration
 vsphere_vm_deploy_network_adapter_type: "vmxnet3"

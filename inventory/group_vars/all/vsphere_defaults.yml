@@ -33,7 +33,7 @@ vsphere_assets:
 
 # Get the default asset version
 default_vsphere_asset: "{{ vsphere_assets | selectattr('default', 'equalto', true) | first }}"
-deployment_version: "{{ lookup('ansible.builtin.env', 'VERSION') | default(default_vsphere_asset.name) }}"
+deployment_version: "{{ lookup('ansible.builtin.env', 'VERSION') | default(default_vsphere_asset.name, true) }}"
 
 # NFS datastore configuration (can be overridden in topology file)
 nfs_datastores: []
