@@ -10,6 +10,8 @@ molecule-plugins[docker]>=23.5.0
 # VMware dependencies
 pyvmomi>=8.0.0
 pyvim>=3.0.0
+# vSphere Automation SDK (PyPI packages are broken, install from GitHub)
+vsphere-automation-sdk @ git+https://github.com/vmware/vsphere-automation-sdk-python.git
 
 # General Python dependencies
 requests>=2.31.0
