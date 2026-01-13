@@ -11,9 +11,10 @@
     dest: "{{ vsphere_vm_deploy_certificate_download_path }}/{{ vcenter_vm.name }}-certs.zip"
     validate_certs: false
     mode: '0644'
+    timeout: 30
   register: vsphere_vm_deploy_cert_download
-  retries: 3
-  delay: 10
+  retries: 10
+  delay: 30
   until: vsphere_vm_deploy_cert_download is succeeded
 
 - name: "vCenter {{ vcenter_vm.name }} - Extract certificate bundle"

@@ -2,7 +2,7 @@
 # Configure cluster with DRS, HA, and resource pools
 
 - name: "Cluster {{ cluster.name }} - Create cluster in {{ datacenter.name }}"
-  community.vmware.vmware_cluster:
+  vmware.vmware.cluster:
     hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
     username: "{{ vsphere_datacenter_config_vcenter.username }}"
     password: "{{ vsphere_datacenter_config_vcenter.password }}"
@@ -12,7 +12,7 @@
     state: present
 
 - name: "Cluster {{ cluster.name }} - Enable DRS"
-  community.vmware.vmware_cluster_drs:
+  vmware.vmware.cluster_drs:
     hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
     username: "{{ vsphere_datacenter_config_vcenter.username }}"
     password: "{{ vsphere_datacenter_config_vcenter.password }}"
@@ -25,7 +25,7 @@
   when: cluster.drs_enabled | default(vsphere_datacenter_config_drs_enabled) | bool
 
 - name: "Cluster {{ cluster.name }} - Enable HA"
-  community.vmware.vmware_cluster_ha:
+  vmware.vmware.cluster_ha:
     hostname: "{{ vsphere_datacenter_config_vcenter.hostname }}"
     username: "{{ vsphere_datacenter_config_vcenter.username }}"
     password: "{{ vsphere_datacenter_config_vcenter.password }}"

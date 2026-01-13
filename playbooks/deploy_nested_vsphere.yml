@@ -50,50 +50,75 @@
         vsphere_vm_deploy_parent_vcenter: "{{ vsphere_parent_vcenter }}"
         vsphere_vm_deploy_esxi_hosts: "{{ _topology.esxi_hosts | default([]) }}"
         vsphere_vm_deploy_vcenter_vms: "{{ _topology.vcenter_vms | default([]) }}"
-        vsphere_vm_deploy_content_library: "{{ _topology.content_library | default({}) }}"
+        vsphere_vm_deploy_content_library: "{{ _topology.content_library.name | default('nested') }}"
+        vsphere_vm_deploy_vcenter_ova_name: "{{ _topology.content_library.vcenter_template_item | default('VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10') }}"
         vsphere_vm_deploy_wait_for_ip: "{{ _topology.wait_for_ip | default(true) }}"
         vsphere_vm_deploy_wait_timeout: "{{ _topology.vm_wait_timeout | default(900) }}"
+        esxi_template_name: "{{ _topology.esxi_template_name | default(omit) }}"
 
     # Phase 2: Configure Datacenter and Cluster Infrastructure
     - name: "Phase 2: Configure Datacenters and Clusters"
       ansible.builtin.include_role:
         name: vsphere_datacenter_config
       vars:
-        vsphere_datacenter_config_vcenter: "{{ item }}"
-        vsphere_datacenter_config_datacenters: "{{ item.datacenters | default([]) }}"
-      loop: "{{ _topology.vcenter_vms | default([]) }}"
-      loop_control:
-        loop_var: item
-        label: "{{ item.hostname }}"
-      when: _topology.vcenter_vms | default([]) | length > 0
-
-    # Phase 3: Add ESXi Hosts to vCenter
-    - name: "Phase 3: Add ESXi Hosts to Clusters"
-      ansible.builtin.include_role:
-        name: vsphere_host_config
-      vars:
-        vsphere_host_config_vcenter: "{{ item }}"
-        vsphere_host_config_esxi_hosts: "{{ item.esxi_hosts | default([]) }}"
-      loop: "{{ _topology.vcenter_vms | default([]) }}"
-      loop_control:
-        loop_var: item
-        label: "{{ item.hostname }}"
-      when: _topology.vcenter_vms | default([]) | length > 0
-
-    # Phase 4: Configure Networking (Distributed vSwitch)
-    - name: "Phase 4: Configure Distributed vSwitch"
-      ansible.builtin.include_role:
-        name: vsphere_networking
-      vars:
-        vsphere_networking_vcenter: "{{ item }}"
-        vsphere_networking_dvswitches: "{{ item.dvswitches | default([]) }}"
+        vsphere_datacenter_config_vcenter:
+          hostname: "{{ hostvars[item.name].vcenter_ip | default(item.ip) | default(item.hostname) }}"
+          username: "{{ hostvars[item.name].vcenter_username | default(item.username) }}"
+          password: "{{ hostvars[item.name].vcenter_password | default(item.password) }}"
+          validate_certs: false
+        vsphere_datacenter_config_topology:
+          datacenters: "{{ item.datacenters | default([]) }}"
       loop: "{{ _topology.vcenter_vms | default([]) }}"
       loop_control:
         loop_var: item
         label: "{{ item.hostname }}"
       when:
         - _topology.vcenter_vms | default([]) | length > 0
-        - item.dvswitches | default([]) | length > 0
+        - item.datacenters | default([]) | length > 0
+
+    # Phase 3: Add ESXi Hosts to vCenter
+    - name: "Phase 3: Add ESXi Hosts to Clusters"
+      ansible.builtin.include_role:
+        name: vsphere_host_config
+      vars:
+        vsphere_host_config_vcenter:
+          hostname: "{{ hostvars[vcenter_item.name].vcenter_ip | default(vcenter_item.ip) | default(vcenter_item.hostname) }}"
+          username: "{{ hostvars[vcenter_item.name].vcenter_username | default(vcenter_item.username) }}"
+          password: "{{ hostvars[vcenter_item.name].vcenter_password | default(vcenter_item.password) }}"
+          validate_certs: false
+        vsphere_host_config_esxi_hosts: "{{ _esxi_hosts_with_ips }}"
+        _esxi_hosts_with_ips: >-
+          {%- set result = [] -%}
+          {%- for esxi in _topology.esxi_hosts | default([]) -%}
+            {%- set _ = result.append(esxi | combine({'hostname': hostvars[esxi.name].ansible_host | default(esxi.name)})) -%}
+          {%- endfor -%}
+          {{ result }}
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: vcenter_item
+        label: "{{ vcenter_item.hostname }}"
+      when:
+        - _topology.vcenter_vms | default([]) | length > 0
+        - _topology.esxi_hosts | default([]) | length > 0
+
+    # Phase 4: Configure Networking (Distributed vSwitch)
+    - name: "Phase 4: Configure Distributed vSwitch"
+      ansible.builtin.include_role:
+        name: vsphere_networking
+      vars:
+        vsphere_networking_vcenter:
+          hostname: "{{ hostvars[vcenter_item.name].vcenter_ip | default(vcenter_item.ip) | default(vcenter_item.hostname) }}"
+          username: "{{ hostvars[vcenter_item.name].vcenter_username | default(vcenter_item.username) }}"
+          password: "{{ hostvars[vcenter_item.name].vcenter_password | default(vcenter_item.password) }}"
+          validate_certs: false
+        vsphere_networking_dvswitches: "{{ vcenter_item.dvswitches | default([]) }}"
+      loop: "{{ _topology.vcenter_vms | default([]) }}"
+      loop_control:
+        loop_var: vcenter_item
+        label: "{{ vcenter_item.hostname }}"
+      when:
+        - _topology.vcenter_vms | default([]) | length > 0
+        - vcenter_item.dvswitches | default([]) | length > 0
 
     # Phase 5: Configure Storage (VMFS and NFS)
     - name: "Phase 5: Configure Datastores"
@@ -115,13 +140,17 @@
       ansible.builtin.include_role:
         name: vsphere_tagging
       vars:
-        vsphere_tagging_vcenter: "{{ item }}"
+        vsphere_tagging_vcenter:
+          hostname: "{{ hostvars[vcenter_item.name].vcenter_ip | default(vcenter_item.ip) | default(vcenter_item.hostname) }}"
+          username: "{{ hostvars[vcenter_item.name].vcenter_username | default(vcenter_item.username) }}"
+          password: "{{ hostvars[vcenter_item.name].vcenter_password | default(vcenter_item.password) }}"
+          validate_certs: false
         vsphere_tagging_failure_domains: "{{ _topology.failure_domains | default([]) }}"
         vsphere_tagging_region: "{{ _topology.region | default('region-1') }}"
       loop: "{{ _topology.vcenter_vms | default([]) }}"
       loop_control:
-        loop_var: item
-        label: "{{ item.hostname }}"
+        loop_var: vcenter_item
+        label: "{{ vcenter_item.hostname }}"
       when:
         - _topology.vcenter_vms | default([]) | length > 0
         - _topology.failure_domains | default([]) | length > 0
@@ -131,12 +160,16 @@
       ansible.builtin.include_role:
         name: vsphere_host_groups
       vars:
-        vsphere_host_groups_vcenter: "{{ item }}"
+        vsphere_host_groups_vcenter:
+          hostname: "{{ hostvars[vcenter_item.name].vcenter_ip | default(vcenter_item.ip) | default(vcenter_item.hostname) }}"
+          username: "{{ hostvars[vcenter_item.name].vcenter_username | default(vcenter_item.username) }}"
+          password: "{{ hostvars[vcenter_item.name].vcenter_password | default(vcenter_item.password) }}"
+          validate_certs: false
         vsphere_host_groups_failure_domains: "{{ _topology.failure_domains | default([]) }}"
       loop: "{{ _topology.vcenter_vms | default([]) }}"
       loop_control:
-        loop_var: item
-        label: "{{ item.hostname }}"
+        loop_var: vcenter_item
+        label: "{{ vcenter_item.hostname }}"
       when:
         - _topology.vcenter_vms | default([]) | length > 0
         - _topology.failure_domains | default([]) | selectattr('zone_type', 'defined') | selectattr('zone_type', 'equalto', 'HostGroup') | list | length > 0
@@ -165,7 +198,7 @@
         content: |
           ---
           deployment_name: {{ _topology.deployment_name | default('nested-vsphere') }}
-          deployment_date: {{ ansible_date_time.iso8601 }}
+          deployment_date: {{ lookup('pipe', 'date --iso-8601=seconds') }}
           topology_file: {{ topology_file }}
           esxi_hosts: {{ _topology.esxi_hosts | default([]) | to_nice_yaml(indent=2) | indent(2) }}
           vcenter_vms: {{ _topology.vcenter_vms | default([]) | to_nice_yaml(indent=2) | indent(2) }}

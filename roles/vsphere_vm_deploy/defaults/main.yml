@@ -97,4 +97,4 @@ vsphere_vm_deploy_logging_enabled: true
 
 # Certificate retrieval
 vsphere_vm_deploy_retrieve_certificates: true
-vsphere_vm_deploy_certificate_download_path: "{{ shared_dir | default('/tmp') }}"
+vsphere_vm_deploy_certificate_download_path: "/tmp"

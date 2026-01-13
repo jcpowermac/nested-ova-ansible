@@ -7,7 +7,7 @@
     vsphere_vm_deploy_esxi_cpu_var: "{{ esxi_host.cpu | default(vsphere_vm_deploy_esxi_cpu) }}"
     vsphere_vm_deploy_esxi_disk_gb_var: "{{ esxi_host.disk_gb | default(vsphere_vm_deploy_esxi_disk_gb) }}"
     vsphere_vm_deploy_esxi_networks_var: "{{ esxi_host.networks | default([{'name': vsphere_vm_deploy_parent_vcenter.network, 'connected': true}]) }}"
-    vsphere_vm_deploy_esxi_template_name: "{{ vsphere_vm_deploy_esxi_template_prefix }}-{{ vsphere_vm_deploy_parent_vcenter.cluster }}"
+    vsphere_vm_deploy_esxi_template_name: "{{ esxi_template_name | default(vsphere_vm_deploy_esxi_template_prefix ~ '-' ~ vsphere_vm_deploy_parent_vcenter.cluster) }}"
 
 - name: "ESXi {{ esxi_host.name }} - Log deployment parameters"
   ansible.builtin.debug:
@@ -146,7 +146,10 @@
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
     name: "{{ esxi_host.name }}"
   register: vsphere_vm_deploy_esxi_vm_final_info
-  until: vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 is defined and vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 | length > 0
+  until: >-
+    vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 is defined and
+    vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 is not none and
+    vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 | length > 0
   retries: "{{ vsphere_vm_deploy_wait_for_ip_retries }}"
   delay: "{{ vsphere_vm_deploy_wait_for_ip_delay }}"
   changed_when: false
@@ -165,9 +168,12 @@
     esxi_password: "{{ vsphere_vm_deploy_nested_password }}"
 
 - name: "ESXi {{ esxi_host.name }} - Wait for ESXi API to be ready"
-  ansible.builtin.wait_for:
-    host: "{{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }}"
-    port: 443
-    sleep: "{{ vsphere_vm_deploy_wait_for_service_sleep }}"
-    timeout: "{{ vsphere_vm_deploy_wait_for_service_timeout }}"
-  delegate_to: localhost
+  community.vmware.vmware_about_info:
+    hostname: "{{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }}"
+    username: "root"
+    password: "{{ vsphere_vm_deploy_nested_password }}"
+    validate_certs: false
+  retries: 30
+  delay: 20
+  register: vsphere_vm_deploy_esxi_api_result
+  until: vsphere_vm_deploy_esxi_api_result is succeeded

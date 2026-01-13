@@ -1,0 +1,44 @@
+---
+# Custom retry loop for ESXi API readiness with IP re-query on each attempt
+# This handles DHCP IP changes that can occur during ESXi boot and API initialization
+
+- name: "ESXi {{ esxi_host.name }} - Re-query current IP"
+  community.vmware.vmware_guest_info:
+    hostname: "{{ vsphere_vm_deploy_parent_vcenter.hostname }}"
+    username: "{{ vsphere_vm_deploy_parent_vcenter.username }}"
+    password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
+    validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
+    datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
+    name: "{{ esxi_host.name }}"
+  register: vsphere_vm_deploy_esxi_current_ip_check
+  changed_when: false
+
+- name: "ESXi {{ esxi_host.name }} - Log IP change if detected"
+  ansible.builtin.debug:
+    msg: "ESXi {{ esxi_host.name }} IP changed from {{ vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4 }} to {{ vsphere_vm_deploy_esxi_current_ip_check.instance.ipv4 }}"
+  when: vsphere_vm_deploy_esxi_current_ip_check.instance.ipv4 != vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4
+
+- name: "ESXi {{ esxi_host.name }} - Update inventory if IP changed"
+  ansible.builtin.add_host:
+    name: "{{ esxi_host.name }}"
+    groups: deployed_esxi
+    ansible_host: "{{ vsphere_vm_deploy_esxi_current_ip_check.instance.ipv4 }}"
+    esxi_ip: "{{ vsphere_vm_deploy_esxi_current_ip_check.instance.ipv4 }}"
+    esxi_username: "root"
+    esxi_password: "{{ vsphere_vm_deploy_nested_password }}"
+  when: vsphere_vm_deploy_esxi_current_ip_check.instance.ipv4 != vsphere_vm_deploy_esxi_vm_final_info.instance.ipv4
+
+- name: "ESXi {{ esxi_host.name }} - Check ESXi API"
+  community.vmware.vmware_about_info:
+    hostname: "{{ vsphere_vm_deploy_esxi_current_ip_check.instance.ipv4 }}"
+    username: "root"
+    password: "{{ vsphere_vm_deploy_nested_password }}"
+    validate_certs: false
+  register: vsphere_vm_deploy_esxi_api_check
+  changed_when: false
+  failed_when: false  # Don't fail, we handle it in the until condition
+
+- name: "ESXi {{ esxi_host.name }} - Pause before next iteration if API not ready"
+  ansible.builtin.pause:
+    seconds: 20
+  when: vsphere_vm_deploy_esxi_api_check is failed or vsphere_vm_deploy_esxi_api_check.about is not defined

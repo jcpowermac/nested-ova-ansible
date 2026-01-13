@@ -26,7 +26,7 @@ vsphere_assets:
     http_server: "{{ lookup('ansible.builtin.env', 'OVA_HTTP_SERVER') | default('') }}"
     default: false
   - name: "VC8.0.2.00100-22617221-ESXi8.0u2c"
-    esxi_ova: "Nested_ESXi8.0u2c_Appliance_Template_v1.ova"
+    esxi_ova: "Nested_ESXi8.0u2c"
     vcenter_ova: "VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova"
     http_server: "{{ lookup('ansible.builtin.env', 'OVA_HTTP_SERVER') | default('') }}"
     default: true

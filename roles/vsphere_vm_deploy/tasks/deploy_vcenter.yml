@@ -69,15 +69,14 @@
         password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
         validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
         name: "{{ vcenter_vm.name }}"
-        vapp_properties:
+        vapp_properties: "{{ _vcenter_vapp_properties }}"
+      vars:
+        _vcenter_vapp_base:
           - id: DeploymentOption.value
             value: "{{ vsphere_vm_deploy_vcenter_deployment_size_var }}"
             userConfigurable: true
           - id: guestinfo.cis.appliance.net.addr.family
             value: ipv4
-            userConfigurable: true
-          - id: guestinfo.cis.appliance.net.mode
-            value: dhcp
             userConfigurable: true
           - id: guestinfo.cis.appliance.root.passwd
             value: "{{ vsphere_vm_deploy_nested_password }}"
@@ -97,7 +96,42 @@
           - id: guestinfo.cis.appliance.ssh.enabled
             value: "True"
             userConfigurable: true
-      register: vsphere_vm_deploy_vcenter_config_result
+        _vcenter_vapp_static:
+          - id: guestinfo.cis.appliance.net.mode
+            value: "static"
+            userConfigurable: true
+          - id: guestinfo.cis.appliance.net.addr
+            value: "{{ vcenter_vm.ip }}"
+            userConfigurable: true
+          - id: guestinfo.cis.appliance.net.prefix
+            value: "{{ vcenter_vm.mask | ansible.utils.ipaddr('prefix') | string }}"
+            userConfigurable: true
+          - id: guestinfo.cis.appliance.net.gateway
+            value: "{{ vcenter_vm.gw }}"
+            userConfigurable: true
+          - id: guestinfo.cis.appliance.net.dns.servers
+            value: "{{ vcenter_vm.dns }}"
+            userConfigurable: true
+          - id: guestinfo.cis.appliance.ntp.servers
+            value: "{{ vcenter_vm.ntp | default('time.google.com') }}"
+            userConfigurable: true
+        _vcenter_vapp_dhcp:
+          - id: guestinfo.cis.appliance.net.mode
+            value: dhcp
+            userConfigurable: true
+        _vcenter_vapp_properties: "{{ _vcenter_vapp_base + (_vcenter_vapp_static if vcenter_vm.ip is defined else _vcenter_vapp_dhcp) }}"
+      register: vsphere_vm_deploy_vcenter_vapp_result
+
+    - name: "vCenter {{ vcenter_vm.name }} - Power on to apply vApp properties"
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_vm_deploy_parent_vcenter.hostname }}"
+        username: "{{ vsphere_vm_deploy_parent_vcenter.username }}"
+        password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
+        validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
+        datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
+        name: "{{ vcenter_vm.name }}"
+        state: poweredon
+      when: vsphere_vm_deploy_vcenter_vapp_result.changed
 
   when: vsphere_vm_deploy_vcenter_vm_info.instance is not defined or vsphere_vm_deploy_force_recreate | bool
 
@@ -143,7 +177,10 @@
     datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
     name: "{{ vcenter_vm.name }}"
   register: vsphere_vm_deploy_vcenter_vm_final_info
-  until: vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 is defined and vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 | length > 0
+  until: >-
+    vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 is defined and
+    vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 is not none and
+    vsphere_vm_deploy_vcenter_vm_final_info.instance.ipv4 | length > 0
   retries: "{{ vsphere_vm_deploy_wait_for_ip_retries }}"
   delay: "{{ vsphere_vm_deploy_wait_for_ip_delay }}"
   changed_when: false
@@ -174,4 +211,4 @@
 
 - name: "vCenter {{ vcenter_vm.name }} - Log vCenter version"
   ansible.builtin.debug:
-    msg: "vCenter {{ vcenter_vm.name }} is ready - Version: {{ vsphere_vm_deploy_vcenter_api_result.about.fullName }}"
+    msg: "vCenter {{ vcenter_vm.name }} is ready - Version: {{ vsphere_vm_deploy_vcenter_api_result.about_info.fullName | default('Unknown') }}"
