@@ -43,6 +43,39 @@
         label: "{{ fd.name }}"
       when: _host_group_failure_domains | length > 0
 
+    - name: Attach zone tags to ESXi hosts in host groups
+      community.vmware.vmware_tag_manager:
+        hostname: "{{ vsphere_host_groups_vcenter.hostname }}"
+        username: "{{ vsphere_host_groups_vcenter.username }}"
+        password: "{{ vsphere_host_groups_vcenter.password }}"
+        validate_certs: "{{ vsphere_host_groups_vcenter.validate_certs }}"
+        object_name: "{{ item.1 }}"
+        object_type: "HostSystem"
+        tag_names:
+          - "{{ item.0.zone }}"
+        state: present
+      loop: "{{ _host_group_failure_domains | subelements('hosts') }}"
+      loop_control:
+        label: "{{ item.0.zone }} -> {{ item.1 }}"
+      when: _host_group_failure_domains | length > 0
+
+    - name: Attach region tags to clusters when using HostGroup zone type
+      community.vmware.vmware_tag_manager:
+        hostname: "{{ vsphere_host_groups_vcenter.hostname }}"
+        username: "{{ vsphere_host_groups_vcenter.username }}"
+        password: "{{ vsphere_host_groups_vcenter.password }}"
+        validate_certs: "{{ vsphere_host_groups_vcenter.validate_certs }}"
+        object_name: "{{ fd.cluster }}"
+        object_type: "ClusterComputeResource"
+        tag_names:
+          - "{{ fd.region }}"
+        state: present
+      loop: "{{ _host_group_failure_domains }}"
+      loop_control:
+        loop_var: fd
+        label: "{{ fd.region }}"
+      when: _host_group_failure_domains | length > 0
+
     - name: Log host groups configuration complete
       ansible.builtin.debug:
         msg: "Host groups configuration completed"

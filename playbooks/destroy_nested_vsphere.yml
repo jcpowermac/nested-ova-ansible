@@ -7,7 +7,9 @@
   gather_facts: false
   vars:
     # Load deployment state or topology file
-    deployment_name: "{{ lookup('env', 'DEPLOYMENT_NAME') | default('nested-vsphere', true) }}"
+    # Auto-detect state file from vsphere_topology.yml deployment_name
+    _topology_for_name: "{{ lookup('file', playbook_dir ~ '/../vsphere_topology.yml') | from_yaml }}"
+    deployment_name: "{{ lookup('env', 'DEPLOYMENT_NAME') | default(_topology_for_name.deployment_name, true) }}"
     state_file: "{{ playbook_dir }}/../state/{{ deployment_name }}_deployment.yml"
     topology_file: "{{ lookup('env', 'VSPHERE_TOPOLOGY_FILE') | default('vsphere_topology.yml', true) }}"
     # Resolve topology file path relative to project root
@@ -27,20 +29,36 @@
       register: _state_file_stat
 
     - name: Load deployment state if available
-      ansible.builtin.include_vars:
-        file: "{{ state_file }}"
-        name: _deployment
+      block:
+        - name: Try to load deployment state
+          ansible.builtin.include_vars:
+            file: "{{ state_file }}"
+            name: _deployment
+          register: _state_load_result
+      rescue:
+        - name: State file has YAML errors, will use simple destroy method
+          ansible.builtin.set_fact:
+            _state_file_corrupted: true
+            _deployment: {}
       when: _state_file_stat.stat.exists
+
+    - name: Set state file corruption flag if not set
+      ansible.builtin.set_fact:
+        _state_file_corrupted: false
+      when: _state_file_corrupted is not defined
 
     - name: Load topology file as fallback
       ansible.builtin.include_vars:
         file: "{{ _topology_file_path }}"
         name: _topology
-      when: not _state_file_stat.stat.exists
+      when:
+        - not _state_file_stat.stat.exists
+        - not _state_file_corrupted
 
     - name: Set deployment variables from state or topology
       ansible.builtin.set_fact:
-        _deployment_config: "{{ _deployment if _state_file_stat.stat.exists else _topology }}"
+        _deployment_config: "{{ _deployment if (_state_file_stat.stat.exists and not _state_file_corrupted) else _topology }}"
+      when: not _state_file_corrupted
 
     - name: Display destroy information
       ansible.builtin.debug:
@@ -70,6 +88,35 @@
         - _destroy_confirm.user_input | default('') != 'yes'
 
   tasks:
+    # Simple destroy method when state file is corrupted
+    - name: "Simple Destroy: Find all nested VMs"
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vsphere_parent_vcenter.hostname }}"
+        username: "{{ vsphere_parent_vcenter.username }}"
+        password: "{{ vsphere_parent_vcenter.password }}"
+        validate_certs: false
+      register: _vm_info
+      when: _state_file_corrupted
+
+    - name: "Simple Destroy: Filter nested VMs"
+      ansible.builtin.set_fact:
+        _nested_vms: "{{ _vm_info.virtual_machines | selectattr('guest_name', 'defined') | selectattr('guest_name', 'match', '^nested-.*') | list }}"
+      when: _state_file_corrupted
+
+    - name: "Simple Destroy: Delete all nested VMs"
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_parent_vcenter.hostname }}"
+        username: "{{ vsphere_parent_vcenter.username }}"
+        password: "{{ vsphere_parent_vcenter.password }}"
+        validate_certs: false
+        name: "{{ item.guest_name }}"
+        state: absent
+        force: true
+      loop: "{{ _nested_vms | default([]) }}"
+      loop_control:
+        label: "{{ item.guest_name }}"
+      when: _state_file_corrupted
+
     # Phase 1: Remove DRS Host Groups (HostGroup zone_type only)
     - name: "Phase 1: Remove DRS Host Groups"
       community.vmware.vmware_drs_group:
@@ -97,12 +144,16 @@
       vars:
         vcenter_vm: "{{ item[0] }}"
         fd: "{{ item[1] }}"
-      when: destroy_mode in ['soft', 'hard']
+      when:
+        - not _state_file_corrupted
+        - destroy_mode in ['soft', 'hard']
       failed_when: false
 
     # Phase 2: Remove OpenShift Tags
     - name: "Phase 2: Remove OpenShift Tags"
-      when: destroy_mode in ['soft', 'hard']
+      when:
+        - not _state_file_corrupted
+        - destroy_mode in ['soft', 'hard']
       block:
         - name: Remove zone tags from each vCenter
           community.vmware.vmware_tag:
@@ -186,7 +237,9 @@
           loop_control:
             label: "{{ item.name }}"
           failed_when: false
-      when: destroy_mode == 'hard'
+      when:
+        - not _state_file_corrupted
+        - destroy_mode == 'hard'
 
   post_tasks:
     - name: Destruction summary

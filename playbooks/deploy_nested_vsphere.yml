@@ -193,16 +193,19 @@
           - "=========================================="
       when: _topology.vcenter_vms | default([]) | length > 0
 
+    - name: Prepare deployment state data
+      ansible.builtin.set_fact:
+        _deployment_state:
+          deployment_name: "{{ _topology.deployment_name | default('nested-vsphere') }}"
+          deployment_date: "{{ lookup('pipe', 'date --iso-8601=seconds') }}"
+          topology_file: "{{ topology_file }}"
+          esxi_hosts: "{{ _topology.esxi_hosts | default([]) }}"
+          vcenter_vms: "{{ _topology.vcenter_vms | default([]) }}"
+          failure_domains: "{{ _topology.failure_domains | default([]) }}"
+
     - name: Save deployment state
       ansible.builtin.copy:
-        content: |
-          ---
-          deployment_name: {{ _topology.deployment_name | default('nested-vsphere') }}
-          deployment_date: {{ lookup('pipe', 'date --iso-8601=seconds') }}
-          topology_file: {{ topology_file }}
-          esxi_hosts: {{ _topology.esxi_hosts | default([]) | to_nice_yaml(indent=2) | indent(2) }}
-          vcenter_vms: {{ _topology.vcenter_vms | default([]) | to_nice_yaml(indent=2) | indent(2) }}
-          failure_domains: {{ _topology.failure_domains | default([]) | to_nice_yaml(indent=2) | indent(2) }}
+        content: "{{ _deployment_state | to_nice_yaml }}"
         dest: "{{ playbook_dir }}/../state/{{ _topology.deployment_name | default('nested-vsphere') }}_deployment.yml"
         mode: '0644'
       when: vsphere_save_state | default(true) | bool

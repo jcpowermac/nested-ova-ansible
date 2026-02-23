@@ -6,7 +6,7 @@
     vsphere_vm_deploy_esxi_memory_mb_var: "{{ esxi_host.memory_mb | default(vsphere_vm_deploy_esxi_memory_mb) }}"
     vsphere_vm_deploy_esxi_cpu_var: "{{ esxi_host.cpu | default(vsphere_vm_deploy_esxi_cpu) }}"
     vsphere_vm_deploy_esxi_disk_gb_var: "{{ esxi_host.disk_gb | default(vsphere_vm_deploy_esxi_disk_gb) }}"
-    vsphere_vm_deploy_esxi_networks_var: "{{ esxi_host.networks | default([{'name': vsphere_vm_deploy_parent_vcenter.network, 'connected': true}]) }}"
+    vsphere_vm_deploy_esxi_networks_var: "{{ [{'name': vsphere_vm_deploy_parent_vcenter.network, 'connected': true}] * vsphere_vm_deploy_esxi_network_adapters }}"
     vsphere_vm_deploy_esxi_template_name: "{{ esxi_template_name | default(vsphere_vm_deploy_esxi_template_prefix ~ '-' ~ vsphere_vm_deploy_parent_vcenter.cluster) }}"
 
 - name: "ESXi {{ esxi_host.name }} - Log deployment parameters"
@@ -26,8 +26,45 @@
   failed_when: false
   changed_when: false
 
-- name: "ESXi {{ esxi_host.name }} - Deploy from template"
+- name: "ESXi {{ esxi_host.name }} - Deploy from content library or template"
   block:
+    - name: "ESXi {{ esxi_host.name }} - Deploy OVF from content library"
+      vmware.vmware.deploy_content_library_ovf:
+        hostname: "{{ vsphere_vm_deploy_parent_vcenter.hostname }}"
+        username: "{{ vsphere_vm_deploy_parent_vcenter.username }}"
+        password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
+        validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
+        library_name: "{{ vsphere_vm_deploy_esxi_content_library | default(vsphere_vm_deploy_content_library) }}"
+        library_item_name: "{{ vsphere_vm_deploy_esxi_template_item }}"
+        vm_name: "{{ esxi_host.name }}"
+        datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
+        cluster: "{{ vsphere_vm_deploy_parent_vcenter.cluster }}"
+        datastore: "{{ vsphere_vm_deploy_parent_vcenter.datastore }}"
+        folder: "{{ vsphere_vm_deploy_parent_vcenter.folder }}"
+      register: vsphere_vm_deploy_esxi_deploy_result
+      when: vsphere_vm_deploy_use_content_library | default(false) | bool
+
+    - name: "ESXi {{ esxi_host.name }} - Configure vApp properties (content library)"
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_vm_deploy_parent_vcenter.hostname }}"
+        username: "{{ vsphere_vm_deploy_parent_vcenter.username }}"
+        password: "{{ vsphere_vm_deploy_parent_vcenter.password }}"
+        validate_certs: "{{ vsphere_vm_deploy_parent_vcenter.validate_certs }}"
+        datacenter: "{{ vsphere_vm_deploy_parent_vcenter.datacenter }}"
+        name: "{{ esxi_host.name }}"
+        state: present
+        vapp_properties:
+          - id: guestinfo.password
+            value: "{{ vsphere_vm_deploy_nested_password }}"
+        hardware:
+          memory_mb: "{{ vsphere_vm_deploy_esxi_memory_mb_var }}"
+          num_cpus: "{{ vsphere_vm_deploy_esxi_cpu_var }}"
+          nested_virt: true
+          version: "{{ vsphere_vm_deploy_vm_version }}"
+          cpu_shares_level: "{{ vsphere_vm_deploy_cpu_shares_level }}"
+          mem_shares_level: "{{ vsphere_vm_deploy_mem_shares_level }}"
+      when: vsphere_vm_deploy_use_content_library | default(false) | bool
+
     - name: "ESXi {{ esxi_host.name }} - Clone from template"
       community.vmware.vmware_guest:
         hostname: "{{ vsphere_vm_deploy_parent_vcenter.hostname }}"
@@ -53,6 +90,7 @@
           cpu_shares_level: "{{ vsphere_vm_deploy_cpu_shares_level }}"
           mem_shares_level: "{{ vsphere_vm_deploy_mem_shares_level }}"
       register: vsphere_vm_deploy_esxi_deploy_result
+      when: not (vsphere_vm_deploy_use_content_library | default(false) | bool)
 
     - name: "ESXi {{ esxi_host.name }} - Configure network adapters"
       community.vmware.vmware_guest_network:

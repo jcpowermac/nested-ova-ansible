@@ -55,8 +55,10 @@ vsphere_vm_deploy_vcenter_deployment_size: "tiny"  # tiny, small, medium, large,
 vsphere_vm_deploy_nested_password: "{{ nested_esxi_password }}"
 vsphere_vm_deploy_nested_vcenter_domain: "{{ nested_vsphere_domain | default('vsphere.local') }}"
 
-# Content library settings for vCenter OVA deployment
-vsphere_vm_deploy_content_library: "nested"
+# Content library settings for OVA deployment
+vsphere_vm_deploy_content_library: "nested-local"
+vsphere_vm_deploy_use_content_library: true  # Set to false to use VM templates instead
+vsphere_vm_deploy_esxi_template_item: "Nested_ESXi8.0u3g_Appliance_Template_v1"
 vsphere_vm_deploy_vcenter_ova_name: "{{ default_vsphere_asset.vcenter_ova | default('VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova') }}"
 
 # Network configuration

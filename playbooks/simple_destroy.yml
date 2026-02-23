@@ -1,0 +1,38 @@
+---
+- name: Simple Destroy - Remove All Nested VMs
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Find all nested VMs
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vsphere_parent_vcenter.hostname }}"
+        username: "{{ vsphere_parent_vcenter.username }}"
+        password: "{{ vsphere_parent_vcenter.password }}"
+        validate_certs: false
+      register: vm_info
+
+    - name: Filter nested VMs
+      ansible.builtin.set_fact:
+        nested_vms: "{{ vm_info.virtual_machines | selectattr('guest_name', 'defined') | selectattr('guest_name', 'match', '^nested-.*') | list }}"
+
+    - name: Display VMs to delete
+      ansible.builtin.debug:
+        msg: "Found {{ nested_vms | length }} nested VMs to delete: {{ nested_vms | map(attribute='guest_name') | list }}"
+
+    - name: Power off and delete nested VMs
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_parent_vcenter.hostname }}"
+        username: "{{ vsphere_parent_vcenter.username }}"
+        password: "{{ vsphere_parent_vcenter.password }}"
+        validate_certs: false
+        name: "{{ item.guest_name }}"
+        state: absent
+        force: true
+      loop: "{{ nested_vms }}"
+      loop_control:
+        label: "{{ item.guest_name }}"
+
+    - name: Destruction complete
+      ansible.builtin.debug:
+        msg: "Successfully deleted {{ nested_vms | length }} nested VMs"
