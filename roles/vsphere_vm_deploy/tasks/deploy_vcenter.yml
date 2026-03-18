@@ -104,7 +104,7 @@
             value: "{{ vcenter_vm.ip }}"
             userConfigurable: true
           - id: guestinfo.cis.appliance.net.prefix
-            value: "{{ vcenter_vm.mask | ansible.utils.ipaddr('prefix') | string }}"
+            value: "{{ (vcenter_vm.ip ~ '/' ~ vcenter_vm.mask) | ansible.utils.ipaddr('prefix') | string }}"
             userConfigurable: true
           - id: guestinfo.cis.appliance.net.gateway
             value: "{{ vcenter_vm.gw }}"
